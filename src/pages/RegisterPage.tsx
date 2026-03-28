@@ -239,13 +239,11 @@ export default function RegisterPage() {
               <p className="text-[13px] text-gray-600 mb-3">Choose a payment gateway</p>
               <div className="flex items-center gap-4 mb-4">
                 <GatewayOption
-                  id="paystack"
                   selected={gateway === 'paystack'}
                   onSelect={() => { setGateway('paystack'); setErrors((p) => ({ ...p, gateway: '' })) }}
                   logo={<PaystackLogo />}
                 />
                 <GatewayOption
-                  id="flutterwave"
                   selected={gateway === 'flutterwave'}
                   onSelect={() => { setGateway('flutterwave'); setErrors((p) => ({ ...p, gateway: '' })) }}
                   logo={<FlutterwaveLogo />}
@@ -299,8 +297,8 @@ function inputClass(hasError: boolean) {
   }`
 }
 
-function GatewayOption({ id, selected, onSelect, logo }: {
-  id: string; selected: boolean; onSelect: () => void; logo: React.ReactNode
+function GatewayOption({ selected, onSelect, logo }: {
+  selected: boolean; onSelect: () => void; logo: React.ReactNode
 }) {
   return (
     <button

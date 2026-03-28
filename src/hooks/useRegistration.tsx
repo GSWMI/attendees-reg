@@ -1,29 +1,8 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useState, useContext, type ReactNode } from 'react'
 import type { EventData, MealSelection, OrderData } from '../services/api'
+import { RegistrationContext, type QuantityMap } from './registrationContext'
 
-interface QuantityMap {
-  [day: number]: {
-    [slot: string]: {
-      optionIndex: number
-      quantity: number
-    }
-  }
-}
-
-interface RegistrationContextValue {
-  event: EventData | null
-  setEvent: (e: EventData) => void
-  quantities: QuantityMap
-  setQty: (day: number, slot: string, optionIndex: number, delta: number) => void
-  selectOption: (day: number, slot: string, optionIndex: number) => void
-  grandTotal: number
-  mealSelections: MealSelection[]
-  order: OrderData | null
-  setOrder: (o: OrderData) => void
-  clearOrder: () => void
-}
-
-const RegistrationContext = createContext<RegistrationContextValue | null>(null)
+// ── Provider ────────────────────────────────────────────────────────────────
 
 export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [event, setEvent] = useState<EventData | null>(null)
@@ -61,7 +40,8 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
     const dayMap: Record<number, MealSelection> = {}
     Object.entries(quantities).forEach(([dayStr, slots]) => {
       const day = Number(dayStr)
-      Object.entries(slots).forEach(([slot, { optionIndex, quantity }]) => {
+      Object.entries(slots).forEach(([slot, val]) => {
+        const { optionIndex, quantity } = val as { optionIndex: number; quantity: number }
         if (quantity === 0) return
         const group = event.mealOptions?.find((g) => g.day === day && g.slot === slot)
         if (!group) return
@@ -93,6 +73,8 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
     </RegistrationContext.Provider>
   )
 }
+
+// ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useRegistration() {
   const ctx = useContext(RegistrationContext)

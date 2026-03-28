@@ -152,13 +152,13 @@ export function SuccessPage() {
       <Header />
       <AnnouncementBanner />
 
-      <main className="flex-1 max-w-[1000px] mx-auto w-full px-4 py-8">
+      <main className="flex-1 max-w-250 mx-auto w-full px-4 py-8">
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[240px]">
-            <div className="overflow-hidden min-h-[180px] md:min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 min-h-60">
+            <div className="overflow-hidden min-h-45 md:min-h-0">
               {event.bannerUrl
                 ? <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover" />
-                : <div className="w-full h-full bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb] min-h-[180px]" />
+                : <div className="w-full h-full bg-linear-to-br from-[#1a2f4a] to-[#3b5bdb] min-h-45" />
               }
             </div>
             <div className="p-6 md:p-8 flex flex-col justify-center">

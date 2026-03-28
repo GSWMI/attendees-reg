@@ -6,11 +6,6 @@ interface TicketProps {
   event: EventData
 }
 
-function formatDate(s: string) {
-  if (!s) return ''
-  return new Date(s).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
 function formatDateTime(s: string) {
   if (!s) return ''
   return new Date(s).toLocaleString('en-US', {
@@ -19,7 +14,6 @@ function formatDateTime(s: string) {
   })
 }
 
-// Get the actual date for a specific day number within the event
 function getDayDate(event: EventData, day: number): string {
   const start = new Date(event.startDate)
   start.setDate(start.getDate() + day - 1)
@@ -27,7 +21,6 @@ function getDayDate(event: EventData, day: number): string {
 }
 
 const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }, ref) => {
-  // Collect all meal ticket cards from mealSelections
   const ticketCards: {
     day: number
     dayDate: string
@@ -39,7 +32,6 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
 
   order.mealSelections?.forEach((sel) => {
     sel.meals.forEach((meal) => {
-      // Find matching QR code
       const qr = order.qrCodes?.find(
         (q) => q.type === 'meal' && q.day === sel.day && q.mealType === meal.slot
       )
@@ -96,11 +88,10 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
         </div>
       </div>
 
-      {/* Individual ticket cards */}
+      {/* Ticket cards */}
       {ticketCards.map((ticket, i) => (
         <div key={i} style={{ padding: '24px 32px', borderBottom: i < ticketCards.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            {/* Left side */}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '16px', fontWeight: '700', color: '#3b5bdb', marginBottom: '16px' }}>
                 DAY {ticket.day} – {ticket.dayDate}
@@ -121,24 +112,14 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
                 Note: You are only allowed to redeem tickets at designated meal times as announced by the GSWMI logistic team
               </div>
             </div>
-
-            {/* QR Code placeholder */}
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <div style={{
-                width: '120px', height: '120px', border: '3px solid #111',
-                borderRadius: '4px', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', marginBottom: '6px', backgroundColor: '#fff',
-                fontSize: '10px', color: '#6b7280', textAlign: 'center', padding: '4px',
-              }}>
+              <div style={{ width: '120px', height: '120px', border: '3px solid #111', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px', backgroundColor: '#fff' }}>
                 {ticket.qrCode
                   ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticket.qrCode)}`} alt="QR" width="114" height="114" />
-                  : <span>{ticket.qrCode ?? 'QR Code'}</span>
+                  : <span style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', padding: '4px' }}>QR Code</span>
                 }
               </div>
-              <div style={{
-                backgroundColor: '#111', color: 'white', fontSize: '11px',
-                fontWeight: '700', padding: '4px 12px', borderRadius: '2px', letterSpacing: '1px',
-              }}>
+              <div style={{ backgroundColor: '#111', color: 'white', fontSize: '11px', fontWeight: '700', padding: '4px 12px', borderRadius: '2px', letterSpacing: '1px' }}>
                 SCAN ME
               </div>
             </div>

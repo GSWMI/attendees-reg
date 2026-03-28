@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, MapPin, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react'
+import { MapPin, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react'
 import { getEventBySlug } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
@@ -176,7 +176,6 @@ export default function EventPage() {
                   <TotalSummary
                     mealSelections={mealSelections}
                     grandTotal={grandTotal}
-                    event={event}
                     onRegister={() => navigate(`/events/s/${slug}/register`)}
                     hasSelections={hasSelections}
                   />
@@ -273,10 +272,9 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
 
 // ── Total Summary ────────────────────────────────────────────────────────────
 
-function TotalSummary({ mealSelections, grandTotal, event, onRegister, hasSelections }: {
+function TotalSummary({ mealSelections, grandTotal, onRegister, hasSelections }: {
   mealSelections: { day: number; meals: { slot: string; optionName: string; price: number; quantity: number }[] }[]
   grandTotal: number
-  event: { name: string; mealOptions?: { day: number; slot: string; options: { name: string; price: number }[] }[] }
   onRegister: () => void
   hasSelections: boolean
 }) {
