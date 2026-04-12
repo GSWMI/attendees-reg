@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-
-import { verifyPayment, initiatePayment } from '../services/api'
+import { ArrowDownToLine } from 'lucide-react'
+import { verifyPayment, initiatePayment, getEventBySlug } from '../services/api'
+import type { EventData, OrderData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 import TicketDocument from '../components/TicketDocument'
@@ -118,17 +119,53 @@ export function PaymentVerifyPage() {
 
 export function SuccessPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { event, order } = useRegistration()
+  const { event: ctxEvent, order: ctxOrder, setOrder, setEvent } = useRegistration()
   const navigate = useNavigate()
   const ticketRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
+  const [localOrder, setLocalOrder] = useState<OrderData | null>(null)
+  const [localEvent, setLocalEvent] = useState<EventData | null>(null)
 
+  // On mount: use context if available, else fall back to localStorage
   useEffect(() => {
-    if (!order) navigate(slug ? `/events/s/${slug}` : '/')
-  }, [order])
+    const order = ctxOrder ?? (() => {
+      try {
+        const raw = localStorage.getItem('gswmi_order')
+        return raw ? JSON.parse(raw) as OrderData : null
+      } catch { return null }
+    })()
+
+    if (!order) {
+      navigate(slug ? `/events/s/${slug}` : '/')
+      return
+    }
+
+    setLocalOrder(order)
+    if (!ctxOrder) setOrder(order)
+
+    // Try to get event from context first, then from order's eventId
+    const event = ctxEvent ?? null
+    if (event) {
+      setLocalEvent(event)
+    } else {
+      // Try to fetch event by slug stored in localStorage
+      const savedSlug = (() => {
+        try { return localStorage.getItem('gswmi_event_slug') ?? '' } catch { return '' }
+      })()
+      if (savedSlug) {
+        getEventBySlug(savedSlug).then((e) => {
+          setLocalEvent(e)
+          setEvent(e)
+        }).catch(() => {})
+      }
+    }
+  }, [])
+
+  const order = localOrder ?? ctxOrder
+  const event = localEvent ?? ctxEvent
 
   const handleDownload = async () => {
-    if (!ticketRef.current || !order || !event) return
+    if (!ticketRef.current || !order) return
     setDownloading(true)
     try {
       const dataUrl = await toPng(ticketRef.current, {
@@ -158,31 +195,25 @@ export function SuccessPage() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         {/* Banner */}
-        {event?.bannerUrl && !event.bannerUrl.startsWith('blob:') && (
+        {event?.bannerUrl && !event.bannerUrl.startsWith('blob:') ? (
           <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm">
-            <img src={event.bannerUrl} alt={event?.name} className="w-full h-full object-cover"
+            <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
           </div>
-        )}
-        {(!event?.bannerUrl || event.bannerUrl.startsWith('blob:')) && (
+        ) : (
           <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm bg-gradient-to-br from-[#1a2f4a] to-[#2F64E1]" />
         )}
 
         {/* Content */}
         <div className="text-center max-w-[480px]">
-          {/* Celebration icon */}
           <div className="text-[64px] mb-4">🎉</div>
-
           <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Registered!</h2>
-
           <p className="text-[15px] text-gray-600 mb-2">
-            Yay! We can't wait to have you at {event?.name ?? 'the event'}.
+            Yay! We can't wait to have you at {event?.name ?? order.guest?.firstName ? `${order.guest.firstName}'s event` : 'the event'}.
           </p>
-
           <p className="text-[14px] text-gray-400 mb-8">
             A copy of your tickets have been sent to your email. You can also download your ticket here directly.
           </p>
-
           <button
             onClick={handleDownload}
             disabled={downloading}
@@ -211,19 +242,15 @@ export function SuccessPage() {
       <Footer />
 
       {/* Hidden ticket for PDF */}
-      {event && order && (
+      {order && (
         <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}>
-          <TicketDocument ref={ticketRef} order={order} event={event} />
+          <TicketDocument ref={ticketRef} order={order} event={event ?? { _id: '', name: '', description: '', startDate: '', endDate: '', totalDays: 1, registrationOpen: true, mealRegistrationOpen: false }} />
         </div>
       )}
     </div>
   )
 }
 
-
-// ── Payment Callback (Paystack dashboard redirect) ───────────────────────────
-// Paystack ignores callbackUrl and uses the dashboard URL instead.
-// This page catches /payment/callback, verifies, and redirects to success.
 
 export function PaymentCallbackPage() {
   const [searchParams] = useSearchParams()
@@ -241,6 +268,10 @@ export function PaymentCallbackPage() {
         const successStatuses = ['success', 'paid', 'completed', 'successful']
         if (successStatuses.includes(result.status?.toLowerCase())) {
           setOrder(result.order)
+          // Persist to localStorage so success page can read after full reload
+          try {
+            localStorage.setItem('gswmi_order', JSON.stringify(result.order))
+          } catch {}
           navigate('/payment/success')
         } else {
           navigate('/payment/failed')

@@ -60,6 +60,8 @@ export default function EventPage() {
       try {
         const data = await getEventBySlug(slug!)
         setEvent(data)
+        // Save slug so success page can refetch event after page reload
+        try { localStorage.setItem('gswmi_event_slug', slug!) } catch {}
       } catch {
         setNotFound(true)
       } finally {
