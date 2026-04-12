@@ -28,6 +28,7 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
     optionName: string
     quantity: number
     qrCode?: string
+    qrImage?: string
   }[] = []
 
   order.mealSelections?.forEach((sel) => {
@@ -42,9 +43,38 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
         optionName: meal.optionName,
         quantity: meal.quantity,
         qrCode: qr?.code,
+        qrImage: qr?.qrImage,
       })
     })
   })
+
+  // Add accommodation QR if present
+  const accQr = order.qrCodes?.find((q) => q.type === 'accommodation')
+  if (accQr) {
+    ticketCards.push({
+      day: 0,
+      dayDate: '',
+      slot: 'Accommodation',
+      optionName: 'Accommodation ticket',
+      quantity: accQr.quantity ?? 1,
+      qrCode: accQr.code,
+      qrImage: accQr.qrImage,
+    })
+  }
+
+  // Add transport QR if present
+  const transportQr = order.qrCodes?.find((q) => q.type === 'transport')
+  if (transportQr) {
+    ticketCards.push({
+      day: 0,
+      dayDate: '',
+      slot: 'Transportation',
+      optionName: `Transport — ${transportQr.direction ?? 'to venue'}`,
+      quantity: transportQr.quantity ?? 1,
+      qrCode: transportQr.code,
+      qrImage: transportQr.qrImage,
+    })
+  }
 
   return (
     <div ref={ref} style={{ fontFamily: 'sans-serif', width: '600px', backgroundColor: '#fff' }}>
@@ -94,7 +124,7 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '16px', fontWeight: '700', color: '#3b5bdb', marginBottom: '16px' }}>
-                DAY {ticket.day} – {ticket.dayDate}
+                {ticket.day > 0 ? `DAY ${ticket.day} – ${ticket.dayDate}` : ticket.slot.toUpperCase()}
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '2px' }}>Meal slot:</div>
@@ -114,9 +144,11 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
             </div>
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
               <div style={{ width: '120px', height: '120px', border: '3px solid #111', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px', backgroundColor: '#fff' }}>
-                {ticket.qrCode
-                  ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticket.qrCode)}`} alt="QR" width="114" height="114" />
-                  : <span style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', padding: '4px' }}>QR Code</span>
+                {ticket.qrImage
+                  ? <img src={ticket.qrImage} alt="QR" width="114" height="114" />
+                  : ticket.qrCode
+                    ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticket.qrCode)}`} alt="QR" width="114" height="114" />
+                    : <span style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', padding: '4px' }}>QR Code</span>
                 }
               </div>
               <div style={{ backgroundColor: '#111', color: 'white', fontSize: '11px', fontWeight: '700', padding: '4px 12px', borderRadius: '2px', letterSpacing: '1px' }}>

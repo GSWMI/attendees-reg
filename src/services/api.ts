@@ -133,9 +133,12 @@ export interface OrderData {
   mealSelections: MealSelection[]
   qrCodes?: {
     code: string
+    qrImage?: string
     type: string
     day?: number
     mealType?: string
+    direction?: string
+    quantity?: number
     redeemed: boolean
   }[]
   paidAt?: string
@@ -178,12 +181,14 @@ export async function initiatePayment(orderId: string, slug: string): Promise<{ 
 }
 
 export async function verifyPayment(reference: string): Promise<{ status: string; order: OrderData }> {
-  const data = await request<{ success: boolean; data: Record<string, unknown> }>(`/orders/verify/${reference}`)
-  const inner = (data as { success: boolean; data: Record<string, unknown> }).data ?? data
-  const order = ((inner as { order: Record<string, unknown> }).order ?? inner) as Record<string, unknown>
+  const data = await request<Record<string, unknown>>(`/orders/verify/${reference}`)
+  // Response: { success, message, data: { order: { id, status, paymentStatus, qrCodes, ... } } }
+  const inner = (data as { data?: Record<string, unknown> }).data ?? data
+  const order = ((inner as { order?: Record<string, unknown> }).order ?? inner) as Record<string, unknown>
   // Normalise id → _id
   if (order && order.id && !order._id) order._id = order.id
-  const status = ((inner as { status?: string }).status ?? (inner as { paymentStatus?: string }).paymentStatus ?? 'unknown') as string
+  // status is on the order object itself
+  const status = String(order.status ?? order.paymentStatus ?? inner.status ?? 'unknown')
   return { status, order: order as unknown as OrderData }
 }
 
