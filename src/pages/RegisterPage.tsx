@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Mail, Phone, ChevronDown, ChevronUp } from 'lucide-react'
 import { createOrder } from '../services/api'
-import { useRegistration } from '../hooks/useRegistration'
+import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 
 type Gateway = 'paystack' | 'flutterwave'
@@ -10,7 +10,7 @@ type Gateway = 'paystack' | 'flutterwave'
 export default function RegisterPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const { event, mealSelections, grandTotal, setOrder } = useRegistration()
+  const { event, mealSelections, grandTotal, selectedAccommodationId, selectedTransportId, setOrder } = useRegistration()
 
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
@@ -59,6 +59,8 @@ export default function RegisterPage() {
         guest: { firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone },
         mealSelections,
         customAnswers: Object.entries(customAnswers).map(([question, answer]) => ({ question, answer })),
+        ...(selectedAccommodationId ? { accommodationId: selectedAccommodationId } : {}),
+        ...(selectedTransportId ? { transportId: selectedTransportId } : {}),
       })
       setOrder(order)
 
@@ -198,40 +200,76 @@ export default function RegisterPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="text-[16px] font-bold text-[#3b5bdb] mb-4">Order summary</h2>
 
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[14px] text-gray-700">Meal ticket</span>
-                <span className="text-[14px] font-medium text-gray-900">₦{grandTotal.toLocaleString()}</span>
-              </div>
+              {/* Compute line items */}
+              {(() => {
+                const hasMeal = mealSelections.length > 0 && mealSelections.some((s) => s.meals.length > 0)
+                const acc = selectedAccommodationId ? event?.accommodations?.find((a) => a._id === selectedAccommodationId) : null
+                const transport = selectedTransportId ? event?.transport?.find((t) => t._id === selectedTransportId) : null
+                const accPrice = acc?.price ?? 0
+                const transportPrice = transport?.price ?? 0
+                const overallTotal = (hasMeal ? grandTotal : 0) + accPrice + transportPrice
 
-              {/* Toggle details */}
-              <button
-                onClick={() => setShowDetails((v) => !v)}
-                className="flex items-center gap-1 text-[13px] text-red-500 hover:text-red-600 transition-colors mb-3"
-              >
-                {showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                {showDetails ? 'Hide details' : 'Show details'}
-              </button>
-
-              {showDetails && (
-                <div className="mb-4 pl-2 border-l-2 border-gray-100">
-                  {mealSelections.map((sel) => (
-                    <div key={sel.day} className="mb-2">
-                      <p className="text-[11px] font-bold text-[#3b5bdb] uppercase tracking-widest mb-1">Day {sel.day}</p>
-                      {sel.meals.map((meal, i) => (
-                        <div key={i} className="flex justify-between text-[12px] text-gray-600 mb-0.5">
-                          <span className="capitalize">{meal.slot} ×{meal.quantity}</span>
-                          <span>₦{(meal.price * meal.quantity).toLocaleString()}</span>
+                return (
+                  <>
+                    {/* Meal line item — only if meal was selected */}
+                    {hasMeal && (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[14px] text-gray-700">Meal ticket</span>
+                          <span className="text-[14px] font-medium text-gray-900">₦{grandTotal.toLocaleString()}</span>
                         </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
 
-              <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
-                <span className="text-[14px] font-semibold text-gray-900">Grand total</span>
-                <span className="text-[16px] font-bold text-gray-900">₦{grandTotal.toLocaleString()}</span>
-              </div>
+                        {/* Toggle details */}
+                        <button
+                          onClick={() => setShowDetails((v) => !v)}
+                          className="flex items-center gap-1 text-[13px] text-[#3b5bdb] hover:opacity-80 transition-opacity mb-3"
+                        >
+                          {showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          {showDetails ? 'Hide meal details' : 'Show meal details'}
+                        </button>
+
+                        {showDetails && (
+                          <div className="mb-3 pl-2 border-l-2 border-gray-100">
+                            {mealSelections.map((sel) => (
+                              <div key={sel.day} className="mb-2">
+                                <p className="text-[11px] font-bold text-[#3b5bdb] uppercase tracking-widest mb-1">Day {sel.day}</p>
+                                {sel.meals.map((meal, i) => (
+                                  <div key={i} className="flex justify-between text-[12px] text-gray-600 mb-0.5">
+                                    <span className="capitalize">{meal.slot} ×{meal.quantity}</span>
+                                    <span>₦{(meal.price * meal.quantity).toLocaleString()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Accommodation line item */}
+                    {acc && (
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[14px] text-gray-700">Accommodation — {acc.name}</span>
+                        <span className="text-[14px] font-medium text-gray-900">₦{accPrice.toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {/* Transport line item */}
+                    {transport && (
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[14px] text-gray-700">Transport — {transport.pickupLocation}</span>
+                        <span className="text-[14px] font-medium text-gray-900">₦{transportPrice.toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {/* Grand total */}
+                    <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+                      <span className="text-[14px] font-semibold text-gray-900">Grand total</span>
+                      <span className="text-[16px] font-bold text-gray-900">₦{overallTotal.toLocaleString()}</span>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
 
             {/* Payment gateway */}

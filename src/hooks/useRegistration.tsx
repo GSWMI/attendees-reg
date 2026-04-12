@@ -1,12 +1,15 @@
-import { useState, useContext, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { EventData, MealSelection, OrderData } from '../services/api'
-import { RegistrationContext, type QuantityMap } from './registrationContext'
+import { RegistrationContext } from './registrationContext'
+import type { QuantityMap } from './registrationContext'
 
 // ── Provider ────────────────────────────────────────────────────────────────
 
 export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [event, setEvent] = useState<EventData | null>(null)
   const [quantities, setQuantities] = useState<QuantityMap>({})
+  const [selectedAccommodationId, setSelectedAccommodationId] = useState('')
+  const [selectedTransportId, setSelectedTransportId] = useState('')
   const [order, setOrder] = useState<OrderData | null>(null)
 
   const setQty = (day: number, slot: string, optionIndex: number, delta: number) => {
@@ -67,17 +70,11 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
       event, setEvent,
       quantities, setQty, selectOption,
       grandTotal, mealSelections,
+      selectedAccommodationId, setSelectedAccommodationId,
+      selectedTransportId, setSelectedTransportId,
       order, setOrder, clearOrder,
     }}>
       {children}
     </RegistrationContext.Provider>
   )
-}
-
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
-export function useRegistration() {
-  const ctx = useContext(RegistrationContext)
-  if (!ctx) throw new Error('useRegistration must be used within RegistrationProvider')
-  return ctx
 }
