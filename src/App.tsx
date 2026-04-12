@@ -1,11 +1,12 @@
-import { BrowserRouter, Routes, Route, } from 'react-router-dom'
-import { RegistrationProvider } from './hooks/useRegistration'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { RegistrationProvider } from './hooks/useRegistration.tsx'
 import EventPage from './pages/EventPage'
 import RegisterPage from './pages/RegisterPage'
 import {
   PleaseWaitPage,
   PaymentFailedPage,
   PaymentVerifyPage,
+  PaymentCallbackPage,
   SuccessPage,
 } from './pages/StatusPages'
 
@@ -25,6 +26,11 @@ export default function App() {
           <Route path="/events/s/:slug/verify" element={<PaymentVerifyPage />} />
           <Route path="/events/s/:slug/success" element={<SuccessPage />} />
           <Route path="/events/s/:slug/failed" element={<PaymentFailedPage />} />
+
+          {/* Paystack dashboard callback (slug-less) */}
+          <Route path="/payment/callback" element={<PaymentCallbackPage />} />
+          <Route path="/payment/success" element={<SuccessPage />} />
+          <Route path="/payment/failed" element={<PaymentFailedPage />} />
 
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />

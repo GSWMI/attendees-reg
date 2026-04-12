@@ -18,6 +18,10 @@ export interface RegistrationContextValue {
   selectOption: (day: number, slot: string, optionIndex: number) => void
   grandTotal: number
   mealSelections: MealSelection[]
+  selectedAccommodationId: string
+  setSelectedAccommodationId: (id: string) => void
+  selectedTransportId: string
+  setSelectedTransportId: (id: string) => void
   order: OrderData | null
   setOrder: (o: OrderData) => void
   clearOrder: () => void

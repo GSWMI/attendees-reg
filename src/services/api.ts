@@ -33,6 +33,27 @@ export interface CustomQuestion {
   required: boolean
 }
 
+export interface AccommodationData {
+  _id: string
+  name: string
+  description: string
+  price: number
+  peoplePerRoom: number
+  totalCapacity: number
+  available: boolean
+  amenities?: string[]
+}
+
+export interface TransportData {
+  _id: string
+  name: string
+  description: string
+  price: number
+  available: boolean
+  pickupLocation: string
+  dropoffLocation: string
+}
+
 export interface EventData {
   id?: string
   _id: string
@@ -49,24 +70,32 @@ export interface EventData {
   consentText?: string
   registrationOpen: boolean
   mealRegistrationOpen: boolean
+  accommodationRegistrationOpen?: boolean
+  transportRegistrationOpen?: boolean
+  accommodations?: AccommodationData[]
+  transport?: TransportData[]
 }
 
 export async function getEventBySlug(slug: string): Promise<EventData> {
   const data = await request<Record<string, unknown>>(`/events/s/${slug}`)
 
-  console.log('🔍 Raw data:', data)
-  console.log('🔍 data.data:', (data as Record<string, unknown>).data)
-  console.log('🔍 data.data.event:', ((data as Record<string, unknown>).data as Record<string, unknown>)?.event)
-
-  // Unwrap: { success, data: { event: {...} } }
-  const inner = (data as { data: { event: Record<string, unknown> } }).data
-  const event = inner?.event ?? inner ?? data
-
-  console.log('✅ Final event:', event)
+  // Unwrap: { success, data: { event: {...}, accommodations: [], transport: [] } }
+  const inner = (data as { data: { event: Record<string, unknown>; accommodations?: unknown[]; transport?: unknown } }).data
+  const event = (inner?.event ?? inner ?? data) as Record<string, unknown>
 
   // Normalise id → _id
   if (event.id && !event._id) {
     event._id = event.id
+  }
+
+  // Attach accommodations and transport from the same response
+  if (inner?.accommodations && !event.accommodations) {
+    event.accommodations = inner.accommodations
+  }
+  if (inner?.transport !== undefined && !event.transport) {
+    // transport can be null, array, or object — normalise to array
+    const t = inner.transport
+    event.transport = Array.isArray(t) ? t : t ? [t] : []
   }
 
   return event as unknown as EventData
@@ -132,16 +161,30 @@ export async function calculateOrder(payload: CreateOrderPayload): Promise<{ tot
 
 export async function initiatePayment(orderId: string, slug: string): Promise<{ paymentUrl: string; reference: string }> {
   const callbackUrl = `${SITE_URL}/events/s/${slug}/verify`
-  const data = await request<{ success: boolean; data: { paymentUrl: string; reference: string } }>(`/orders/${orderId}/pay`, {
+  const raw = await request<Record<string, unknown>>(`/orders/${orderId}/pay`, {
     method: 'POST',
     body: JSON.stringify({ callbackUrl }),
   })
-  return (data as { success: boolean; data: { paymentUrl: string; reference: string } }).data ?? data
+  console.log('💳 Raw pay response:', JSON.stringify(raw))
+  // Unwrap: { success, data: { authorizationUrl, accessCode, reference } }
+  const inner = (raw as { data?: Record<string, unknown> }).data ?? raw
+  console.log('💳 Inner pay data:', JSON.stringify(inner))
+  const paymentUrl = String(
+    inner.authorizationUrl ?? inner.paymentUrl ?? inner.authorization_url ?? ''
+  )
+  const reference = String(inner.reference ?? inner.accessCode ?? '')
+  console.log('💳 paymentUrl:', paymentUrl, 'reference:', reference)
+  return { paymentUrl, reference }
 }
 
 export async function verifyPayment(reference: string): Promise<{ status: string; order: OrderData }> {
-  const data = await request<{ success: boolean; data: { status: string; order: OrderData } }>(`/orders/verify/${reference}`)
-  return (data as { success: boolean; data: { status: string; order: OrderData } }).data ?? data
+  const data = await request<{ success: boolean; data: Record<string, unknown> }>(`/orders/verify/${reference}`)
+  const inner = (data as { success: boolean; data: Record<string, unknown> }).data ?? data
+  const order = ((inner as { order: Record<string, unknown> }).order ?? inner) as Record<string, unknown>
+  // Normalise id → _id
+  if (order && order.id && !order._id) order._id = order.id
+  const status = ((inner as { status?: string }).status ?? (inner as { paymentStatus?: string }).paymentStatus ?? 'unknown') as string
+  return { status, order: order as unknown as OrderData }
 }
 
 export async function getOrderByNumber(orderNumber: string): Promise<OrderData> {
