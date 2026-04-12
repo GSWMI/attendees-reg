@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ArrowDownToLine } from 'lucide-react'
-import { verifyPayment, initiatePayment, getEventBySlug } from '../services/api'
+import { verifyPayment, initiatePayment, getEventBySlug, getOrderByNumber } from '../services/api'
 import type { EventData, OrderData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
@@ -96,7 +96,8 @@ export function PaymentVerifyPage() {
         const successStatuses = ['success', 'paid', 'completed', 'successful']
         if (successStatuses.includes(result.status?.toLowerCase())) {
           setOrder(result.order)
-          navigate(`/events/s/${slug}/success`)
+          const orderNum = result.order.orderNumber ?? result.order._id ?? ''
+          navigate(`/events/s/${slug}/success?order=${encodeURIComponent(orderNum)}`)
         } else {
           navigate(`/events/s/${slug}/failed`)
         }
@@ -119,50 +120,49 @@ export function PaymentVerifyPage() {
 
 export function SuccessPage() {
   const { slug } = useParams<{ slug: string }>()
+  const [searchParams] = useSearchParams()
   const { event: ctxEvent, order: ctxOrder, setOrder, setEvent } = useRegistration()
   const navigate = useNavigate()
   const ticketRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
-  const [localOrder, setLocalOrder] = useState<OrderData | null>(null)
-  const [localEvent, setLocalEvent] = useState<EventData | null>(null)
+  const [order, setLocalOrder] = useState<OrderData | null>(ctxOrder)
+  const [event, setLocalEvent] = useState<EventData | null>(ctxEvent)
+  const [loading, setLoading] = useState(!ctxOrder)
 
-  // On mount: use context if available, else fall back to localStorage
   useEffect(() => {
-    const order = ctxOrder ?? (() => {
-      try {
-        const raw = localStorage.getItem('gswmi_order')
-        return raw ? JSON.parse(raw) as OrderData : null
-      } catch { return null }
-    })()
+    const orderNumber = searchParams.get('order')
 
-    if (!order) {
+    // If we already have the order in context use it
+    if (ctxOrder) {
+      setLocalOrder(ctxOrder)
+      setLoading(false)
+    } else if (orderNumber) {
+      // Re-fetch by orderNumber from URL — works after full page reload
+      getOrderByNumber(orderNumber)
+        .then((o) => {
+          setLocalOrder(o)
+          setOrder(o)
+        })
+        .catch(() => navigate(slug ? `/events/s/${slug}` : '/'))
+        .finally(() => setLoading(false))
+    } else {
       navigate(slug ? `/events/s/${slug}` : '/')
-      return
     }
 
-    setLocalOrder(order)
-    if (!ctxOrder) setOrder(order)
-
-    // Try to get event from context first, then from order's eventId
-    const event = ctxEvent ?? null
-    if (event) {
-      setLocalEvent(event)
-    } else {
-      // Try to fetch event by slug stored in localStorage
-      const savedSlug = (() => {
+    // Fetch event — use slug from URL params first, then localStorage fallback
+    if (!ctxEvent) {
+      const eventSlug = slug ?? (() => {
         try { return localStorage.getItem('gswmi_event_slug') ?? '' } catch { return '' }
       })()
-      if (savedSlug) {
-        getEventBySlug(savedSlug).then((e) => {
-          setLocalEvent(e)
-          setEvent(e)
-        }).catch(() => {})
+      if (eventSlug) {
+        getEventBySlug(eventSlug)
+          .then((e) => { setLocalEvent(e); setEvent(e) })
+          .catch(() => {})
       }
+    } else {
+      setLocalEvent(ctxEvent)
     }
   }, [])
-
-  const order = localOrder ?? ctxOrder
-  const event = localEvent ?? ctxEvent
 
   const handleDownload = async () => {
     if (!ticketRef.current || !order) return
@@ -186,6 +186,14 @@ export function SuccessPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f5f3]">
+        <div className="w-8 h-8 border-2 border-[#2F64E1] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
   if (!order) return null
 
   return (
@@ -204,12 +212,11 @@ export function SuccessPage() {
           <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm bg-gradient-to-br from-[#1a2f4a] to-[#2F64E1]" />
         )}
 
-        {/* Content */}
         <div className="text-center max-w-[480px]">
           <div className="text-[64px] mb-4">🎉</div>
           <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Registered!</h2>
           <p className="text-[15px] text-gray-600 mb-2">
-            Yay! We can't wait to have you at {event?.name ?? order.guest?.firstName ? `${order.guest.firstName}'s event` : 'the event'}.
+            Yay! We can't wait to have you at {event?.name ?? 'the event'}.
           </p>
           <p className="text-[14px] text-gray-400 mb-8">
             A copy of your tickets have been sent to your email. You can also download your ticket here directly.
@@ -241,7 +248,6 @@ export function SuccessPage() {
 
       <Footer />
 
-      {/* Hidden ticket for PDF */}
       {order && (
         <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}>
           <TicketDocument ref={ticketRef} order={order} event={event ?? { _id: '', name: '', description: '', startDate: '', endDate: '', totalDays: 1, registrationOpen: true, mealRegistrationOpen: false }} />
@@ -268,11 +274,9 @@ export function PaymentCallbackPage() {
         const successStatuses = ['success', 'paid', 'completed', 'successful']
         if (successStatuses.includes(result.status?.toLowerCase())) {
           setOrder(result.order)
-          // Persist to localStorage so success page can read after full reload
-          try {
-            localStorage.setItem('gswmi_order', JSON.stringify(result.order))
-          } catch {}
-          navigate('/payment/success')
+          // Pass orderNumber in URL — no localStorage needed
+          const orderNumber = result.order.orderNumber ?? result.order._id ?? ''
+          navigate(`/payment/success?order=${encodeURIComponent(orderNumber)}`)
         } else {
           navigate('/payment/failed')
         }

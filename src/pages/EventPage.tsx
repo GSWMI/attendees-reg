@@ -240,7 +240,7 @@ export default function EventPage() {
 
           {/* ── Accommodation ticket ── */}
           {hasAccommodation && (
-            <div className="rounded-2xl border border-gray-200 overflow-hidden" style={{ backgroundColor: '#FAFCFF' }}>
+            <div className="rounded-2xl border border-gray-200" style={{ backgroundColor: '#FAFCFF' }}>
               <div className="flex items-center justify-between px-5 py-4">
                 <button onClick={handleAccCheck} className="flex items-center gap-3 flex-1 text-left">
                   <TicketCheckbox checked={accChecked} />
@@ -264,7 +264,7 @@ export default function EventPage() {
                       <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
                     </button>
                     {accDropdownOpen && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                      <div className="absolute z-[100] mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
                         {accommodations.map((acc) => (
                           <button key={acc._id} type="button"
                             onClick={() => { setSelectedAccommodationId(acc._id); setAccDropdownOpen(false) }}
@@ -309,7 +309,7 @@ export default function EventPage() {
 
           {/* ── Transportation ticket ── */}
           {hasTransport && (
-            <div className="rounded-2xl border border-gray-200 overflow-hidden" style={{ backgroundColor: '#FAFCFF' }}>
+            <div className="rounded-2xl border border-gray-200" style={{ backgroundColor: '#FAFCFF' }}>
               <div className="flex items-center justify-between px-5 py-4">
                 <button onClick={handleTransportCheck} className="flex items-center gap-3 flex-1 text-left">
                   <TicketCheckbox checked={transportChecked} />
@@ -333,7 +333,7 @@ export default function EventPage() {
                       <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
                     </button>
                     {transportDropdownOpen && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                      <div className="absolute z-[100] mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
                         {transports.map((t) => (
                           <button key={t._id} type="button"
                             onClick={() => { setSelectedTransportId(t._id); setTransportDropdownOpen(false) }}
