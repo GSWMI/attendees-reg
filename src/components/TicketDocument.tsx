@@ -15,66 +15,19 @@ function formatDateTime(s: string) {
 }
 
 function getDayDate(event: EventData, day: number): string {
+  if (!day || !event.startDate) return ''
   const start = new Date(event.startDate)
   start.setDate(start.getDate() + day - 1)
   return start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()
 }
 
+function capitalize(s: string) {
+  if (!s) return ''
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ')
+}
+
 const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }, ref) => {
-  const ticketCards: {
-    day: number
-    dayDate: string
-    slot: string
-    optionName: string
-    quantity: number
-    qrCode?: string
-    qrImage?: string
-  }[] = []
-
-  order.mealSelections?.forEach((sel) => {
-    sel.meals.forEach((meal) => {
-      const qr = order.qrCodes?.find(
-        (q) => q.type === 'meal' && q.day === sel.day && q.mealType === meal.slot
-      )
-      ticketCards.push({
-        day: sel.day,
-        dayDate: getDayDate(event, sel.day),
-        slot: meal.slot,
-        optionName: meal.optionName,
-        quantity: meal.quantity,
-        qrCode: qr?.code,
-        qrImage: qr?.qrImage,
-      })
-    })
-  })
-
-  // Add accommodation QR if present
-  const accQr = order.qrCodes?.find((q) => q.type === 'accommodation')
-  if (accQr) {
-    ticketCards.push({
-      day: 0,
-      dayDate: '',
-      slot: 'Accommodation',
-      optionName: 'Accommodation ticket',
-      quantity: accQr.quantity ?? 1,
-      qrCode: accQr.code,
-      qrImage: accQr.qrImage,
-    })
-  }
-
-  // Add transport QR if present
-  const transportQr = order.qrCodes?.find((q) => q.type === 'transport')
-  if (transportQr) {
-    ticketCards.push({
-      day: 0,
-      dayDate: '',
-      slot: 'Transportation',
-      optionName: `Transport — ${transportQr.direction ?? 'to venue'}`,
-      quantity: transportQr.quantity ?? 1,
-      qrCode: transportQr.code,
-      qrImage: transportQr.qrImage,
-    })
-  }
+  const qrCodes = order.qrCodes ?? []
 
   return (
     <div ref={ref} style={{ fontFamily: 'sans-serif', width: '600px', backgroundColor: '#fff' }}>
@@ -86,18 +39,18 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
         <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '20px' }}>
           Gbenga Samuel-Wemimo Ministry International
         </div>
-        <div style={{ color: 'white', fontSize: '20px', fontWeight: '600' }}>Meal Ticket</div>
+        <div style={{ color: 'white', fontSize: '20px', fontWeight: '600' }}>Event Ticket</div>
       </div>
 
-      {/* Info section */}
+      {/* Attendee info */}
       <div style={{ padding: '24px 32px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ marginBottom: '12px' }}>
-          <span style={{ fontSize: '13px', color: '#6b7280' }}>Event name: </span>
+          <span style={{ fontSize: '13px', color: '#6b7280' }}>Event: </span>
           <span style={{ fontSize: '13px', color: '#3b5bdb', fontWeight: '600' }}>{event.name}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
           <span style={{ fontSize: '13px', color: '#6b7280' }}>
-            Date of Purchase: <strong style={{ color: '#111' }}>{formatDateTime(order.paidAt ?? order.createdAt)}</strong>
+            Order #: <strong style={{ color: '#111' }}>{order.orderNumber}</strong>
           </span>
           <span style={{ fontSize: '13px', color: '#6b7280' }}>
             Amount paid: <strong style={{ color: '#111' }}>₦{order.totalAmount?.toLocaleString()}</strong>
@@ -108,56 +61,130 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
             Attendee
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>First name: <strong style={{ color: '#111' }}>{order.guest.firstName}</strong></span>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>Last name: <strong style={{ color: '#111' }}>{order.guest.lastName}</strong></span>
+            <span style={{ fontSize: '13px', color: '#6b7280' }}>Name: <strong style={{ color: '#111' }}>{order.guest.firstName} {order.guest.lastName}</strong></span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>Email address: <strong style={{ color: '#111' }}>{order.guest.email}</strong></span>
-            <span style={{ fontSize: '13px', color: '#6b7280' }}>Phone number: <strong style={{ color: '#111' }}>{order.guest.phone}</strong></span>
+            <span style={{ fontSize: '13px', color: '#6b7280' }}>Email: <strong style={{ color: '#111' }}>{order.guest.email}</strong></span>
+            <span style={{ fontSize: '13px', color: '#6b7280' }}>Phone: <strong style={{ color: '#111' }}>{order.guest.phone}</strong></span>
           </div>
         </div>
       </div>
 
-      {/* Ticket cards */}
-      {ticketCards.map((ticket, i) => (
-        <div key={i} style={{ padding: '24px 32px', borderBottom: i < ticketCards.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: '#3b5bdb', marginBottom: '16px' }}>
-                {ticket.day > 0 ? `DAY ${ticket.day} – ${ticket.dayDate}` : ticket.slot.toUpperCase()}
-              </div>
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '2px' }}>Meal slot:</div>
-                <div style={{ fontSize: '15px', fontWeight: '600', color: '#111', textTransform: 'capitalize' }}>{ticket.slot}</div>
-              </div>
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '2px' }}>Meal option:</div>
-                <div style={{ fontSize: '15px', fontWeight: '600', color: '#111' }}>{ticket.optionName}</div>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '2px' }}>No. of packs:</div>
-                <div style={{ fontSize: '15px', fontWeight: '600', color: '#111' }}>{ticket.quantity}</div>
-              </div>
-              <div style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic', maxWidth: '280px' }}>
-                Note: You are only allowed to redeem tickets at designated meal times as announced by the GSWMI logistic team
+      {/* One card per QR code */}
+      {qrCodes.map((qr, i) => {
+        const isMeal = qr.type === 'meal'
+        const isTransport = qr.type === 'transport'
+        const isAccommodation = qr.type === 'accommodation'
+
+        const cardTitle = isMeal
+          ? `MEAL TICKET — DAY ${qr.day}${qr.day && event.startDate ? ` (${getDayDate(event, qr.day)})` : ''}`
+          : isTransport
+            ? 'TRANSPORTATION TICKET'
+            : isAccommodation
+              ? 'ACCOMMODATION TICKET'
+              : qr.type.toUpperCase()
+
+        const headerColor = isMeal ? '#3b5bdb' : isTransport ? '#0d9488' : '#7c3aed'
+
+        return (
+          <div key={i} style={{
+            margin: '0 32px 24px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            marginTop: i === 0 ? '24px' : '0',
+          }}>
+            {/* Card header */}
+            <div style={{ backgroundColor: headerColor, padding: '10px 16px' }}>
+              <div style={{ color: 'white', fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px' }}>
+                {cardTitle}
               </div>
             </div>
-            <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <div style={{ width: '120px', height: '120px', border: '3px solid #111', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px', backgroundColor: '#fff' }}>
-                {ticket.qrImage
-                  ? <img src={ticket.qrImage} alt="QR" width="114" height="114" />
-                  : ticket.qrCode
-                    ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(ticket.qrCode)}`} alt="QR" width="114" height="114" />
-                    : <span style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', padding: '4px' }}>QR Code</span>
-                }
+
+            {/* Card body */}
+            <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, paddingRight: '16px' }}>
+
+                {isMeal && (
+                  <>
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Meal slot</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111', textTransform: 'capitalize' }}>{qr.mealType}</div>
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Meal option</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.optionName}</div>
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Quantity</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.quantity} pack{(qr.quantity ?? 1) > 1 ? 's' : ''}</div>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', maxWidth: '260px', lineHeight: '1.5' }}>
+                      Redeem at designated meal times as announced by the GSWMI logistics team.
+                    </div>
+                  </>
+                )}
+
+                {isTransport && (
+                  <>
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Direction</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{capitalize(qr.direction ?? 'to venue')}</div>
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Quantity</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.quantity} seat{(qr.quantity ?? 1) > 1 ? 's' : ''}</div>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', maxWidth: '260px', lineHeight: '1.5' }}>
+                      Present this QR code to the GSWMI transport team at your pickup location.
+                    </div>
+                  </>
+                )}
+
+                {isAccommodation && (
+                  <>
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Room type</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.optionName ?? 'Accommodation'}</div>
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Quantity</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.quantity} room{(qr.quantity ?? 1) > 1 ? 's' : ''}</div>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#9ca3af', fontStyle: 'italic', maxWidth: '260px', lineHeight: '1.5' }}>
+                      Present this QR code to the GSWMI accommodation team upon check-in.
+                    </div>
+                  </>
+                )}
+
               </div>
-              <div style={{ backgroundColor: '#111', color: 'white', fontSize: '11px', fontWeight: '700', padding: '4px 12px', borderRadius: '2px', letterSpacing: '1px' }}>
-                SCAN ME
+
+              {/* QR code */}
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <div style={{ width: '110px', height: '110px', border: `3px solid ${headerColor}`, borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px', backgroundColor: '#fff' }}>
+                  {qr.qrImage
+                    ? <img src={qr.qrImage} alt="QR" width="104" height="104" />
+                    : qr.code
+                      ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(qr.code)}`} alt="QR" width="104" height="104" />
+                      : <span style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center', padding: '4px' }}>QR Code</span>
+                  }
+                </div>
+                <div style={{ backgroundColor: headerColor, color: 'white', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '2px', letterSpacing: '1px' }}>
+                  SCAN ME
+                </div>
+                <div style={{ fontSize: '9px', color: '#9ca3af', marginTop: '4px' }}>{qr.code}</div>
               </div>
             </div>
           </div>
+        )
+      })}
+
+      {/* Footer */}
+      <div style={{ padding: '16px 32px', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
+        <div style={{ fontSize: '10px', color: '#9ca3af' }}>
+          Generated on {formatDateTime(order.paidAt ?? order.createdAt)} · GSWMI Event Management
         </div>
-      ))}
+      </div>
     </div>
   )
 })

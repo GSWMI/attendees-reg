@@ -137,6 +137,7 @@ export interface OrderData {
     type: string
     day?: number
     mealType?: string
+    optionName?: string
     direction?: string
     quantity?: number
     redeemed: boolean
