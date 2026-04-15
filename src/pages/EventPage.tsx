@@ -11,8 +11,6 @@ function formatDate(s: string) {
   return new Date(s).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// ── Checkbox component ────────────────────────────────────────────────────────
-
 function TicketCheckbox({ checked }: { checked: boolean }) {
   return (
     <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
@@ -40,19 +38,14 @@ export default function EventPage() {
 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-
-  // Checkbox selected + expanded state per ticket type
   const [mealChecked, setMealChecked] = useState(false)
   const [mealOpen, setMealOpen] = useState(false)
   const [accChecked, setAccChecked] = useState(false)
   const [accOpen, setAccOpen] = useState(false)
   const [transportChecked, setTransportChecked] = useState(false)
   const [transportOpen, setTransportOpen] = useState(false)
-
   const [activeDay, setActiveDay] = useState(0)
   const [descExpanded, setDescExpanded] = useState(false)
-  const [accDropdownOpen, setAccDropdownOpen] = useState(false)
-  const [transportDropdownOpen, setTransportDropdownOpen] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -60,7 +53,6 @@ export default function EventPage() {
       try {
         const data = await getEventBySlug(slug!)
         setEvent(data)
-        // Save slug so success page can refetch event after page reload
         try { localStorage.setItem('gswmi_event_slug', slug!) } catch {}
       } catch {
         setNotFound(true)
@@ -94,16 +86,13 @@ export default function EventPage() {
   const days = event.totalDays ? Array.from({ length: event.totalDays }, (_, i) => i + 1) : []
   const tabs = [...days.map((d) => `Day ${d}`), 'Total meal summary']
   const hasSelections = mealSelections.length > 0 && mealSelections.some((s) => s.meals.length > 0)
-
   const accommodations: AccommodationData[] = event.accommodations ?? []
   const transports: TransportData[] = event.transport ?? []
   const selectedAcc = accommodations.find((a) => a._id === selectedAccommodationId)
   const selectedTransport = transports.find((t) => t._id === selectedTransportId)
-
   const hasMeal = event.mealRegistrationOpen && event.mealOptions && event.mealOptions.length > 0
   const hasAccommodation = event.accommodationRegistrationOpen && accommodations.length > 0
   const hasTransport = event.transportRegistrationOpen && transports.length > 0
-
   const canProceed = (mealChecked && hasSelections) || (accChecked && !!selectedAccommodationId) || (transportChecked && !!selectedTransportId)
 
   const getMapsUrl = () => {
@@ -121,14 +110,14 @@ export default function EventPage() {
     const next = !accChecked
     setAccChecked(next)
     setAccOpen(next)
-    if (!next) { setSelectedAccommodationId(''); setAccDropdownOpen(false) }
+    if (!next) setSelectedAccommodationId('')
   }
 
   const handleTransportCheck = () => {
     const next = !transportChecked
     setTransportChecked(next)
     setTransportOpen(next)
-    if (!next) { setSelectedTransportId(''); setTransportDropdownOpen(false) }
+    if (!next) setSelectedTransportId('')
   }
 
   return (
@@ -140,8 +129,8 @@ export default function EventPage() {
 
         {/* Event hero card */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[320px]">
-            <div className="overflow-hidden min-h-[220px] md:min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            <div className="overflow-hidden h-[220px] md:h-[280px] flex-shrink-0">
               {event.bannerUrl && !event.bannerUrl.startsWith('blob:') ? (
                 <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -149,7 +138,7 @@ export default function EventPage() {
                 <div className="w-full h-full bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb] min-h-[220px]" />
               )}
             </div>
-            <div className="p-6 md:p-8 flex flex-col justify-center gap-4">
+            <div className="p-6 md:p-8 flex flex-col justify-center gap-4 md:h-[280px] overflow-y-auto">
               <h1 className="text-3xl md:text-4xl font-bold text-[#0d1b2a] leading-tight">{event.name}</h1>
               {event.description && (
                 <div className="text-[14px] text-gray-600 leading-relaxed">
@@ -190,12 +179,8 @@ export default function EventPage() {
           {/* ── Meal ticket ── */}
           {hasMeal && (
             <div className="rounded-2xl border border-gray-200 overflow-hidden" style={{ backgroundColor: '#FAFCFF' }}>
-              {/* Header */}
               <div className="flex items-center justify-between px-5 py-4">
-                <button
-                  onClick={handleMealCheck}
-                  className="flex items-center gap-3 flex-1 text-left"
-                >
+                <button onClick={handleMealCheck} className="flex items-center gap-3 flex-1 text-left">
                   <TicketCheckbox checked={mealChecked} />
                   <span className="text-[15px] font-semibold text-[#0d1b2a]">Meal ticket</span>
                 </button>
@@ -204,8 +189,6 @@ export default function EventPage() {
                   {mealOpen ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
                 </button>
               </div>
-
-              {/* Content */}
               {mealChecked && mealOpen && (
                 <div className="border-t border-gray-200">
                   <div className="flex border-b border-gray-200 overflow-x-auto bg-white">
@@ -253,29 +236,35 @@ export default function EventPage() {
               </div>
 
               {accChecked && accOpen && (
-                <div className="border-t border-gray-200 p-5 bg-white">
+                <div className="border-t border-gray-200 p-5 bg-white rounded-b-2xl">
                   <p className="text-[13px] font-medium text-gray-600 mb-3">Accommodation options</p>
-                  <div className="relative mb-3">
-                    <button type="button" onClick={() => setAccDropdownOpen((v) => !v)}
-                      className="w-full flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-left bg-white hover:border-gray-300 transition-colors">
-                      <span className={selectedAccommodationId ? 'text-gray-800' : 'text-gray-400'}>
-                        {selectedAcc ? selectedAcc.name : 'Choose an option'}
-                      </span>
-                      <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
-                    </button>
-                    {accDropdownOpen && (
-                      <div className="absolute z-[100] mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                        {accommodations.map((acc) => (
-                          <button key={acc._id} type="button"
-                            onClick={() => { setSelectedAccommodationId(acc._id); setAccDropdownOpen(false) }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between">
-                            <span className="text-[13px] text-gray-700">{acc.name}</span>
-                            <span className="text-[13px] font-medium text-gray-500">₦{acc.price.toLocaleString()}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+
+                  {/* Inline radio options — no dropdown clipping issues */}
+                  <div className="flex flex-col gap-2 mb-3">
+                    {accommodations.map((acc) => (
+                      <button key={acc._id} type="button"
+                        onClick={() => setSelectedAccommodationId(acc._id)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
+                          selectedAccommodationId === acc._id
+                            ? 'border-[#3b5bdb] bg-blue-50/60'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                            selectedAccommodationId === acc._id ? 'border-[#3b5bdb]' : 'border-gray-300'
+                          }`}>
+                            {selectedAccommodationId === acc._id && (
+                              <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />
+                            )}
+                          </div>
+                          <span className="text-[13px] text-gray-700">{acc.name}</span>
+                        </div>
+                        <span className="text-[13px] font-medium text-gray-600">₦{acc.price.toLocaleString()}</span>
+                      </button>
+                    ))}
                   </div>
+
+                  {/* Selected option details */}
                   {selectedAcc && (
                     <div className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3 space-y-2">
                       {selectedAcc.description && <p className="text-[13px] text-gray-600">{selectedAcc.description}</p>}
@@ -322,29 +311,35 @@ export default function EventPage() {
               </div>
 
               {transportChecked && transportOpen && (
-                <div className="border-t border-gray-200 p-5 bg-white">
+                <div className="border-t border-gray-200 p-5 bg-white rounded-b-2xl">
                   <p className="text-[13px] font-medium text-gray-600 mb-3">Pickup location</p>
-                  <div className="relative mb-3">
-                    <button type="button" onClick={() => setTransportDropdownOpen((v) => !v)}
-                      className="w-full flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-left bg-white hover:border-gray-300 transition-colors">
-                      <span className={selectedTransportId ? 'text-gray-800' : 'text-gray-400'}>
-                        {selectedTransport ? selectedTransport.pickupLocation : 'Choose your preferred pickup location'}
-                      </span>
-                      <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
-                    </button>
-                    {transportDropdownOpen && (
-                      <div className="absolute z-[100] mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-                        {transports.map((t) => (
-                          <button key={t._id} type="button"
-                            onClick={() => { setSelectedTransportId(t._id); setTransportDropdownOpen(false) }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between">
-                            <span className="text-[13px] text-gray-700">{t.pickupLocation}</span>
-                            <span className="text-[13px] font-medium text-gray-500">₦{t.price.toLocaleString()}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+
+                  {/* Inline radio options */}
+                  <div className="flex flex-col gap-2 mb-3">
+                    {transports.map((t) => (
+                      <button key={t._id} type="button"
+                        onClick={() => setSelectedTransportId(t._id)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
+                          selectedTransportId === t._id
+                            ? 'border-[#3b5bdb] bg-blue-50/60'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                            selectedTransportId === t._id ? 'border-[#3b5bdb]' : 'border-gray-300'
+                          }`}>
+                            {selectedTransportId === t._id && (
+                              <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />
+                            )}
+                          </div>
+                          <span className="text-[13px] text-gray-700">{t.pickupLocation}</span>
+                        </div>
+                        <span className="text-[13px] font-medium text-gray-600">₦{t.price.toLocaleString()}</span>
+                      </button>
+                    ))}
                   </div>
+
+                  {/* Selected pickup details */}
                   {selectedTransport && (
                     <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between">
                       <div>
@@ -362,7 +357,7 @@ export default function EventPage() {
           )}
         </div>
 
-        {/* ── Single Proceed to checkout button ── */}
+        {/* Single Proceed to checkout button */}
         <button
           onClick={() => navigate(`/events/s/${slug}/register`)}
           disabled={!canProceed}
@@ -379,7 +374,6 @@ export default function EventPage() {
         </button>
 
       </main>
-
       <Footer />
     </div>
   )
@@ -452,7 +446,7 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
   )
 }
 
-// ── Meal Summary (no checkout button — moved to main) ─────────────────────────
+// ── Meal Summary ──────────────────────────────────────────────────────────────
 
 function MealSummary({ mealSelections, grandTotal, hasSelections }: {
   mealSelections: { day: number; meals: { slot: string; optionName: string; price: number; quantity: number }[] }[]

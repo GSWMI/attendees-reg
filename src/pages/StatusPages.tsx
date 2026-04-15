@@ -168,10 +168,23 @@ export function SuccessPage() {
     if (!ticketRef.current || !order) return
     setDownloading(true)
     try {
+      // Wait a tick to ensure hidden ticket is fully rendered
+      await new Promise((res) => setTimeout(res, 300))
       const dataUrl = await toPng(ticketRef.current, {
         cacheBust: true,
         backgroundColor: '#ffffff',
         pixelRatio: 2,
+        skipFonts: true,
+        filter: (node) => {
+          // Skip external images that cause CORS issues — QR codes use base64 so they're fine
+          if (node instanceof HTMLImageElement) {
+            const src = node.getAttribute('src') ?? ''
+            if (src.startsWith('http') && !src.startsWith('data:')) {
+              return false
+            }
+          }
+          return true
+        },
       })
       const img = new Image()
       img.src = dataUrl
@@ -181,6 +194,7 @@ export function SuccessPage() {
       pdf.save(`ticket-${order.orderNumber ?? 'gswmi'}.pdf`)
     } catch (err) {
       console.error('Download failed', err)
+      alert('Download failed. Please try again.')
     } finally {
       setDownloading(false)
     }
@@ -203,14 +217,12 @@ export function SuccessPage() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         {/* Banner */}
-        {event?.bannerUrl && !event.bannerUrl.startsWith('blob:') ? (
-          <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm">
-            <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover"
+        <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm bg-gradient-to-br from-[#1a2f4a] to-[#2F64E1] flex-shrink-0">
+          {event?.bannerUrl && !event.bannerUrl.startsWith('blob:') && (
+            <img src={event.bannerUrl} alt={event?.name ?? ''} className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          </div>
-        ) : (
-          <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm bg-gradient-to-br from-[#1a2f4a] to-[#2F64E1]" />
-        )}
+          )}
+        </div>
 
         <div className="text-center max-w-[480px]">
           <div className="text-[64px] mb-4">🎉</div>
