@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { ArrowDownToLine } from 'lucide-react'
 import { verifyPayment, initiatePayment, getEventBySlug, getOrderByNumber } from '../services/api'
 import type { EventData, OrderData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
