@@ -329,12 +329,7 @@ export default function EventPage() {
                         <Users size={14} className="flex-shrink-0" />
                         <span>Per room: {selectedAcc.peoplePerRoom} {selectedAcc.peoplePerRoom === 1 ? 'person' : 'people'}</span>
                       </div>
-                      {selectedAcc.totalCapacity > 0 && (
-                        <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                          <Users size={14} className="flex-shrink-0" />
-                          <span>Total capacity: {selectedAcc.totalCapacity} {selectedAcc.totalCapacity === 1 ? 'person' : 'people'}</span>
-                        </div>
-                      )}
+
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
                         <Hash size={14} className="flex-shrink-0" />
                         <span>Price: ₦{selectedAcc.price.toLocaleString()}</span>
