@@ -67,7 +67,7 @@ export default function HomePage() {
               >
                 <div className="flex flex-col sm:flex-row">
                   {/* Banner */}
-                  <div className="sm:w-[180px] h-[140px] sm:h-auto flex-shrink-0 bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb]">
+                  <div className="w-full sm:w-[180px] h-[180px] sm:h-[130px] flex-shrink-0 bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb]">
                     {event.bannerUrl && !event.bannerUrl.startsWith('blob:') && (
                       <img
                         src={event.bannerUrl}
