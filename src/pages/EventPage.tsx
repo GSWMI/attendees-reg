@@ -294,7 +294,8 @@ export default function EventPage() {
 
               {accChecked && accOpen && (
                 <div className="border-t border-gray-200 p-5 bg-white rounded-b-2xl">
-                  <p className="text-[13px] font-medium text-gray-600 mb-3">Accommodation options</p>
+                  <p className="text-[13px] font-medium text-gray-600 mb-1">Accommodation options</p>
+                  <p className="text-[12px] text-gray-400 mb-3 italic">Flat rate applies to all accommodation options for the duration of the event.</p>
 
                   {/* Inline radio options — no dropdown clipping issues */}
                   <div className="flex flex-col gap-2 mb-3">
@@ -364,7 +365,8 @@ export default function EventPage() {
 
               {transportChecked && transportOpen && (
                 <div className="border-t border-gray-200 p-5 bg-white rounded-b-2xl">
-                  <p className="text-[13px] font-medium text-gray-600 mb-3">Pickup location</p>
+                  <p className="text-[13px] font-medium text-gray-600 mb-1">Pickup location</p>
+                  <p className="text-[12px] text-gray-400 mb-3 italic">Flat rate applies to all pickup options for the duration of the event.</p>
 
                   {/* Inline radio options */}
                   <div className="flex flex-col gap-2 mb-3">
