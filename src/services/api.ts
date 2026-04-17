@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://gswmi-backend.onrender.com/api'
-const SITE_URL = 'https://gswmi-event.netlify.app'
+const SITE_URL = 'https://gswmi-event2.netlify.app'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`
@@ -95,8 +95,11 @@ export async function getEventBySlug(slug: string): Promise<EventData> {
   if (inner?.transport !== undefined && !event.transport) {
     // transport can be null, array, or object — normalise to array
     const t = inner.transport
-    event.transport = Array.isArray(t) ? t : t ? [t] : []
+    console.log('🚌 raw transport from API:', JSON.stringify(t))
+    event.transport = Array.isArray(t) ? t : t ? [t as Record<string, unknown>] : []
+    console.log('🚌 normalised transport:', event.transport)
   }
+  console.log('🎟️ full event keys:', Object.keys(event))
 
   return event as unknown as EventData
 }
