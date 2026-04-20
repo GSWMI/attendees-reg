@@ -119,7 +119,14 @@ export interface MealSelection {
 
 export interface CreateOrderPayload {
   eventId: string
-  guest: { firstName: string; lastName: string; email: string; phone: string }
+  guest: { 
+    firstName: string
+    lastName: string
+    email: string
+    phone: string
+    gender: string
+    nextOfKin: { fullName: string; email: string }
+  }
   mealSelections: MealSelection[]
   customAnswers: { question: string; answer: string }[]
   wantsTransport?: boolean
@@ -132,7 +139,14 @@ export interface OrderData {
   status: string
   paymentStatus: string
   totalAmount: number
-  guest: { firstName: string; lastName: string; email: string; phone: string }
+  guest: { 
+    firstName: string
+    lastName: string
+    email: string
+    phone: string
+    gender: string
+    nextOfKin: { fullName: string; email: string }
+  }
   mealSelections: MealSelection[]
   qrCodes?: {
     code: string
@@ -142,6 +156,8 @@ export interface OrderData {
     mealType?: string
     optionName?: string
     direction?: string
+    pickupLocation?: string
+    accommodationName?: string
     quantity?: number
     redeemed: boolean
   }[]

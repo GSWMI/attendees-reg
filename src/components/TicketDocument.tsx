@@ -28,7 +28,7 @@ function capitalize(s: string) {
 
 function getPurchaseDate(order: OrderData): string {
   const raw = order.paidAt ?? order.paid_at ?? order.createdAt ?? order.created_at ?? ''
-  return raw ? formatDateTime(raw) : 'N/A'
+  return raw ? formatDateTime(raw) : formatDateTime(new Date().toISOString())
 }
 
 const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }, ref) => {
@@ -68,11 +68,35 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
         </div>
 
         {/* Date of purchase */}
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: '10px' }}>
           <span style={{ fontSize: '13px', color: '#6b7280' }}>
             Date of purchase: <strong style={{ color: '#111' }}>{getPurchaseDate(order)}</strong>
           </span>
         </div>
+
+        {/* Accommodation type */}
+        {(() => {
+          const accQr = qrCodes.find((q) => q.type === 'accommodation')
+          return accQr?.accommodationName ? (
+            <div style={{ marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                Accommodation: <strong style={{ color: '#111' }}>{accQr.accommodationName}</strong>
+              </span>
+            </div>
+          ) : null
+        })()}
+
+        {/* Pickup location */}
+        {(() => {
+          const transportQr = qrCodes.find((q) => q.type === 'transport')
+          return transportQr?.pickupLocation ? (
+            <div style={{ marginBottom: '16px' }}>
+              <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                Pickup location: <strong style={{ color: '#111' }}>{transportQr.pickupLocation}</strong>
+              </span>
+            </div>
+          ) : null
+        })()}
 
         {/* Attendee details */}
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>

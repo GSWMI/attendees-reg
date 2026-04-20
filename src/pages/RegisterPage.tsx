@@ -14,6 +14,8 @@ export default function RegisterPage() {
 
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
+    gender: '' as 'male' | 'female' | '',
+    nokFullName: '', nokEmail: '',
   })
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
   const [consent, setConsent] = useState(false)
@@ -39,6 +41,10 @@ export default function RegisterPage() {
     if (!form.email.trim()) errs.email = 'Required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Invalid email'
     if (!form.phone.trim()) errs.phone = 'Required'
+    if (!form.gender) errs.gender = 'Required'
+    if (!form.nokFullName.trim()) errs.nokFullName = 'Required'
+    if (!form.nokEmail.trim()) errs.nokEmail = 'Required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.nokEmail)) errs.nokEmail = 'Invalid email'
     if (!consent) errs.consent = 'You must agree to the terms'
     if (!gateway) errs.gateway = 'Please choose a payment gateway'
     event?.customQuestions?.forEach((q) => {
@@ -56,7 +62,17 @@ export default function RegisterPage() {
     try {
       const order = await createOrder({
         eventId: event._id ?? event.id ?? "",
-        guest: { firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone },
+        guest: {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            email: form.email,
+            phone: form.phone,
+            gender: form.gender,
+            nextOfKin: {
+              fullName: form.nokFullName.trim(),
+              email: form.nokEmail.trim(),
+            },
+          },
         mealSelections,
         customAnswers: Object.entries(customAnswers).map(([question, answer]) => ({ question, answer })),
         ...(selectedAccommodationId ? { accommodationId: selectedAccommodationId } : {}),
@@ -76,7 +92,7 @@ export default function RegisterPage() {
 
   if (!event) return null
 
-  const canCheckout = form.firstName && form.lastName && form.email && form.phone && consent && gateway
+  const canCheckout = form.firstName && form.lastName && form.email && form.phone && form.gender && form.nokFullName && form.nokEmail && consent && gateway
 
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
@@ -133,7 +149,7 @@ export default function RegisterPage() {
               />
             </FormField>
 
-            <FormField label="Phone number" required error={errors.phone}
+            <FormField label="WhatsApp phone number" required error={errors.phone}
               icon={<Phone size={15} className="text-gray-400" />}>
               <input
                 type="tel"
@@ -143,6 +159,50 @@ export default function RegisterPage() {
                 className={inputClass(!!errors.phone)}
               />
             </FormField>
+
+            {/* Gender */}
+            <FormField label="Gender" required error={errors.gender}>
+              <div className="flex gap-3">
+                {(['male', 'female'] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => { update('gender', g); setErrors((p) => ({ ...p, gender: '' })) }}
+                    className={`flex-1 py-3 rounded-lg border text-[14px] font-medium capitalize transition-all ${
+                      form.gender === g
+                        ? 'border-[#3b5bdb] bg-blue-50/60 text-[#3b5bdb]'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </FormField>
+
+            {/* Next of kin */}
+            <div className="rounded-xl border border-gray-200 p-4 flex flex-col gap-4">
+              <p className="text-[14px] font-semibold text-gray-800">Next of kin <span className="text-[#3b5bdb] ml-1">*</span></p>
+              <FormField label="Full name" required error={errors.nokFullName}
+                icon={<User size={15} className="text-gray-400" />}>
+                <input
+                  value={form.nokFullName}
+                  onChange={(e) => update('nokFullName', e.target.value)}
+                  placeholder="Full name"
+                  className={inputClass(!!errors.nokFullName)}
+                />
+              </FormField>
+              <FormField label="Email address" required error={errors.nokEmail}
+                icon={<Mail size={15} className="text-gray-400" />}>
+                <input
+                  type="email"
+                  value={form.nokEmail}
+                  onChange={(e) => update('nokEmail', e.target.value)}
+                  placeholder="Email address"
+                  className={inputClass(!!errors.nokEmail)}
+                />
+              </FormField>
+            </div>
 
             {/* Custom questions */}
             {event.customQuestions?.map((q) => (
