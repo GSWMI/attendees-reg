@@ -1,25 +1,34 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://gswmi-backend.onrender.com/api'
-const SITE_URL = 'https://logistics.gswmi.com/attendee-reg'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://ticket-booking-dev.onrender.com/api'
+const SITE_URL = 'https://events.gswmi.com'
+
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`
-  console.log('🌐 API request:', url)
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   })
   const data = await res.json()
-  console.log('📦 API response:', data)
   if (!res.ok) throw new Error(data.message ?? 'Something went wrong')
   return data
 }
 
-// ── Event ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Normalize id → _id on any object so components can use _id safely
+function normalizeId<T extends Record<string, unknown>>(obj: T): T {
+  if (obj && obj.id && !obj._id) {
+    return { ...obj, _id: obj.id }
+  }
+  return obj
+}
+
+// ── Event ─────────────────────────────────────────────────────────────────────
 
 export interface MealOptionItem {
   name: string
   price: number
-  limit?: number
+  limit?: number | null
 }
 
 export interface MealOptionGroup {
@@ -76,35 +85,41 @@ export interface EventData {
   transport?: TransportData[]
 }
 
+// GET /events/s/:slug
+// Response: { success, data: { event: {...}, accommodations: [...], transport: [...] } }
+// accommodations and transport are siblings of event, not nested inside it
 export async function getEventBySlug(slug: string): Promise<EventData> {
-  const data = await request<Record<string, unknown>>(`/events/s/${slug}`)
+  const data = await request<{ success: boolean; data: Record<string, unknown> }>(`/events/s/${slug}`)
+  const inner = data.data ?? {}
 
-  // Unwrap: { success, data: { event: {...}, accommodations: [], transport: [] } }
-  const inner = (data as { data: { event: Record<string, unknown>; accommodations?: unknown[]; transport?: unknown } }).data
-  const event = (inner?.event ?? inner ?? data) as Record<string, unknown>
+  const rawEvent = (inner.event ?? inner) as Record<string, unknown>
+  const event = normalizeId(rawEvent)
 
-  // Normalise id → _id
-  if (event.id && !event._id) {
-    event._id = event.id
+  // Attach accommodations — sibling of event in the response
+  if (inner.accommodations && !event.accommodations) {
+    const raw = inner.accommodations as Record<string, unknown>[]
+    event.accommodations = raw.map(normalizeId)
   }
 
-  // Attach accommodations and transport from the same response
-  if (inner?.accommodations && !event.accommodations) {
-    event.accommodations = inner.accommodations
-  }
-  if (inner?.transport !== undefined && !event.transport) {
-    // transport can be null, array, or object — normalise to array
+  // Attach transport — sibling of event in the response
+  if (inner.transport !== undefined && !event.transport) {
     const t = inner.transport
-    console.log('🚌 raw transport from API:', JSON.stringify(t))
-    event.transport = Array.isArray(t) ? t : t ? [t as Record<string, unknown>] : []
-    console.log('🚌 normalised transport:', event.transport)
+    const rawArr: Record<string, unknown>[] = Array.isArray(t) ? t : t ? [t as Record<string, unknown>] : []
+    event.transport = rawArr.map(normalizeId)
   }
-  console.log('🎟️ full event keys:', Object.keys(event))
 
   return event as unknown as EventData
 }
 
-// ── Order ──────────────────────────────────────────────────────────────────
+// GET /events/public — public endpoint, no auth required
+// Response: { success, data: { events: [...] } }
+export async function getAllEvents(): Promise<EventData[]> {
+  const data = await request<{ success: boolean; data: { events: EventData[] } }>('/events/public')
+  const events = data?.data?.events ?? []
+  return events.map((e) => normalizeId(e as unknown as Record<string, unknown>)) as unknown as EventData[]
+}
+
+// ── Order ─────────────────────────────────────────────────────────────────────
 
 export interface MealSelection {
   day: number
@@ -119,7 +134,7 @@ export interface MealSelection {
 
 export interface CreateOrderPayload {
   eventId: string
-  guest: { 
+  guest: {
     firstName: string
     lastName: string
     email: string
@@ -129,8 +144,8 @@ export interface CreateOrderPayload {
   }
   mealSelections: MealSelection[]
   customAnswers: { question: string; answer: string }[]
-  wantsTransport?: boolean
   accommodationId?: string
+  transportId?: string  // backend expects transportId, not wantsTransport
 }
 
 export interface OrderData {
@@ -139,7 +154,7 @@ export interface OrderData {
   status: string
   paymentStatus: string
   totalAmount: number
-  guest: { 
+  guest: {
     firstName: string
     lastName: string
     email: string
@@ -168,64 +183,62 @@ export interface OrderData {
 }
 
 export async function createOrder(payload: CreateOrderPayload): Promise<OrderData> {
-  const data = await request<Record<string, unknown>>('/orders', {
+  const data = await request<{ success: boolean; data: { order: OrderData } }>('/orders', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
-  const inner = (data as { data: { order: OrderData } }).data
-  return (inner as { order: OrderData }).order ?? inner ?? data
+  const order = data.data?.order ?? (data.data as unknown as OrderData) ?? (data as unknown as OrderData)
+  return normalizeId(order as unknown as Record<string, unknown>) as unknown as OrderData
 }
 
-export async function calculateOrder(payload: CreateOrderPayload): Promise<{ totalAmount: number; breakdown: Record<string, number> }> {
-  const data = await request<{ success: boolean; data: { totalAmount: number; breakdown: Record<string, number> } }>('/orders/calculate', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  })
-  return (data as { success: boolean; data: { totalAmount: number; breakdown: Record<string, number> } }).data ?? data
+export async function calculateOrder(
+  payload: CreateOrderPayload
+): Promise<{ totalAmount: number; breakdown: Record<string, number> }> {
+  const data = await request<{ success: boolean; data: { totalAmount: number; breakdown: Record<string, number> } }>(
+    '/orders/calculate',
+    { method: 'POST', body: JSON.stringify(payload) }
+  )
+  return data.data ?? (data as unknown as { totalAmount: number; breakdown: Record<string, number> })
 }
 
-export async function initiatePayment(orderId: string, slug: string): Promise<{ paymentUrl: string; reference: string }> {
+// POST /orders/:orderId/pay
+// Response: { success, data: { authorizationUrl, accessCode, reference } }
+export async function initiatePayment(
+  orderId: string,
+  slug: string
+): Promise<{ paymentUrl: string; reference: string }> {
   const callbackUrl = `${SITE_URL}/events/s/${slug}/verify`
-  const raw = await request<Record<string, unknown>>(`/orders/${orderId}/pay`, {
+  const raw = await request<{ success: boolean; data: Record<string, unknown> }>(`/orders/${orderId}/pay`, {
     method: 'POST',
     body: JSON.stringify({ callbackUrl }),
   })
-  console.log('💳 Raw pay response:', JSON.stringify(raw))
-  // Unwrap: { success, data: { authorizationUrl, accessCode, reference } }
-  const inner = (raw as { data?: Record<string, unknown> }).data ?? raw
-  console.log('💳 Inner pay data:', JSON.stringify(inner))
-  const paymentUrl = String(
-    inner.authorizationUrl ?? inner.paymentUrl ?? inner.authorization_url ?? ''
-  )
+  const inner = raw.data ?? (raw as unknown as Record<string, unknown>)
+  const paymentUrl = String(inner.authorizationUrl ?? inner.paymentUrl ?? inner.authorization_url ?? '')
   const reference = String(inner.reference ?? inner.accessCode ?? '')
-  console.log('💳 paymentUrl:', paymentUrl, 'reference:', reference)
   return { paymentUrl, reference }
 }
 
-export async function verifyPayment(reference: string): Promise<{ status: string; order: OrderData }> {
-  const data = await request<Record<string, unknown>>(`/orders/verify/${reference}`)
-  // Response: { success, message, data: { order: { id, status, paymentStatus, qrCodes, ... } } }
-  const inner = (data as { data?: Record<string, unknown> }).data ?? data
-  const order = ((inner as { order?: Record<string, unknown> }).order ?? inner) as Record<string, unknown>
-  // Normalise id → _id
-  if (order && order.id && !order._id) order._id = order.id
-  // status is on the order object itself
-  const status = String(order.status ?? order.paymentStatus ?? inner.status ?? 'unknown')
-  return { status, order: order as unknown as OrderData }
+// GET /orders/verify/:reference
+// Response: { success, data: { order: { id, status, paymentStatus, qrCodes, ... } } }
+export async function verifyPayment(
+  reference: string
+): Promise<{ status: string; order: OrderData }> {
+  const data = await request<{ success: boolean; data: { order: Record<string, unknown> } }>(
+    `/orders/verify/${reference}`
+  )
+  const inner = data.data ?? (data as unknown as { order: Record<string, unknown> })
+  const rawOrder = (inner as { order?: Record<string, unknown> }).order ?? (inner as Record<string, unknown>)
+  const order = normalizeId(rawOrder as Record<string, unknown>) as unknown as OrderData
+  const status = String(rawOrder.status ?? rawOrder.paymentStatus ?? 'unknown')
+  return { status, order }
 }
 
+// GET /orders/lookup/:orderNumber
 export async function getOrderByNumber(orderNumber: string): Promise<OrderData> {
-  const data = await request<{ success: boolean; data: { order: OrderData } | OrderData }>(`/orders/lookup/${orderNumber}`)
-  const inner = (data as { success: boolean; data: { order: OrderData } }).data
-  return (inner as { order: OrderData }).order ?? inner ?? data
-}
-
-export async function getAllEvents(): Promise<EventData[]> {
-  const data = await request<{ success: boolean; data: { events?: EventData[]; event?: EventData[] } | EventData[] }>('/events/public')
-  const inner = (data as { success: boolean; data: unknown }).data ?? data
-  if (Array.isArray(inner)) return inner as EventData[]
-  const arr = (inner as { events?: EventData[]; event?: EventData[] }).events
-    ?? (inner as { event?: EventData[] }).event
-    ?? []
-  return arr
+  const data = await request<{ success: boolean; data: { order: OrderData } | OrderData }>(
+    `/orders/lookup/${orderNumber}`
+  )
+  const inner = (data as { success: boolean; data: { order?: OrderData } }).data
+  const raw = ((inner as { order?: OrderData }).order ?? inner ?? data) as Record<string, unknown>
+  return normalizeId(raw) as unknown as OrderData
 }

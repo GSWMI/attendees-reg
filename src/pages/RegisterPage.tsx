@@ -5,7 +5,7 @@ import { createOrder } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 
-type Gateway = 'paystack' | 'flutterwave'
+type Gateway = 'paystack' 
 
 export default function RegisterPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -330,7 +330,7 @@ export default function RegisterPage() {
                   </>
                 )
               })()}
-            </div>
+            </div>F
 
             {/* Payment gateway */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -341,11 +341,11 @@ export default function RegisterPage() {
                   onSelect={() => { setGateway('paystack'); setErrors((p) => ({ ...p, gateway: '' })) }}
                   logo={<PaystackLogo />}
                 />
-                <GatewayOption
+                {/* <GatewayOption
                   selected={gateway === 'flutterwave'}
                   onSelect={() => { setGateway('flutterwave'); setErrors((p) => ({ ...p, gateway: '' })) }}
                   logo={<FlutterwaveLogo />}
-                />
+                /> */}
               </div>
               {errors.gateway && <p className="text-[12px] text-red-500 mb-3">{errors.gateway}</p>}
 
@@ -428,13 +428,13 @@ function PaystackLogo() {
   )
 }
 
-function FlutterwaveLogo() {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-5 h-5 bg-gradient-to-br from-[#f5a623] to-[#e55] rounded-full flex items-center justify-center">
-        <span className="text-white text-[8px] font-bold">F</span>
-      </div>
-      <span className="text-[14px] font-bold text-gray-800">flutterwave</span>
-    </div>
-  )
-}
+// function FlutterwaveLogo() {
+//   return (
+//     <div className="flex items-center gap-1.5">
+//       <div className="w-5 h-5 bg-gradient-to-br from-[#f5a623] to-[#e55] rounded-full flex items-center justify-center">
+//         <span className="text-white text-[8px] font-bold">F</span>
+//       </div>
+//       <span className="text-[14px] font-bold text-gray-800">flutterwave</span>
+//     </div>
+//   )
+// }
