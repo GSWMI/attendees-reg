@@ -1,11 +1,8 @@
 export function Header() {
   return (
-    <header className="bg-[#0d1b2a] px-6 py-4 flex items-center justify-between">
+    <header className="bg-[#0C2039] px-6 py-4 flex items-center justify-between">
       <div className="flex flex-col">
-        <span className="text-white text-xl font-bold font-serif italic tracking-wide">╱GSWMI</span>
-        <span className="text-white/40 text-[8px] tracking-widest uppercase leading-tight">
-          Gbenga Samuel-Wemimo Ministry International
-        </span>
+        <img src="/logo.png" alt="GSWMI" className="h-10 object-contain" />
       </div>
       <a
         href="mailto:support@gswmi.com"
