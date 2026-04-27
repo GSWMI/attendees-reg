@@ -19,9 +19,9 @@ export function Header() {
 
 export function AnnouncementBanner({ text }: { text?: string }) {
   return (
-    <div className="bg-[#dce8f5] text-center py-2.5 overflow-hidden">
-      <p className="text-[#3b5bdb] text-[13px] animate-marquee whitespace-nowrap inline-block">
-        {text ?? 'Announcement / event notice / general update banner in slow motion'}
+    <div className="bg-red-600 text-center py-2.5 overflow-hidden">
+      <p className="text-white text-[13px] font-medium animate-marquee whitespace-nowrap inline-block">
+        {text ?? 'For safety and comfort reasons, kids and expectant moms are NOT ALLOWED to register.'}
       </p>
     </div>
   )
