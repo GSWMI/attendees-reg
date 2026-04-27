@@ -68,42 +68,21 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
         </div>
 
         {/* Date of purchase */}
-        <div style={{ marginBottom: '10px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <span style={{ fontSize: '13px', color: '#6b7280' }}>
             Date of purchase: <strong style={{ color: '#111' }}>{getPurchaseDate(order)}</strong>
           </span>
         </div>
 
-        {/* Accommodation type */}
-        {(() => {
-          const accQr = qrCodes.find((q) => q.type === 'accommodation')
-          return accQr?.accommodationName ? (
-            <div style={{ marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                Accommodation: <strong style={{ color: '#111' }}>{accQr.accommodationName}</strong>
-              </span>
-            </div>
-          ) : null
-        })()}
-
-        {/* Pickup location */}
-        {(() => {
-          const transportQr = qrCodes.find((q) => q.type === 'transport')
-          return transportQr?.pickupLocation ? (
-            <div style={{ marginBottom: '16px' }}>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                Pickup location: <strong style={{ color: '#111' }}>{transportQr.pickupLocation}</strong>
-              </span>
-            </div>
-          ) : null
-        })()}
+        {/* NOTE: Accommodation and pickup location are intentionally NOT shown here.
+            They appear inside their respective ticket cards below. */}
 
         {/* Attendee details */}
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
           <div style={{ fontSize: '11px', fontWeight: '700', color: '#3b5bdb', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '10px' }}>
             Attendee
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <div style={{ marginBottom: '6px' }}>
             <span style={{ fontSize: '13px', color: '#6b7280' }}>
               Name: <strong style={{ color: '#111' }}>{order.guest.firstName} {order.guest.lastName}</strong>
             </span>
@@ -118,7 +97,7 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
           </div>
         </div>
 
-      </div>{/* end attendee info */}
+      </div>
 
       {/* ── One card per QR code ── */}
       {qrCodes.map((qr, i) => {
@@ -179,6 +158,13 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
 
                 {isTransport && (
                   <>
+                    {/* Pickup location shown here in the card, not at the top */}
+                    {qr.pickupLocation && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Pickup location</div>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.pickupLocation}</div>
+                      </div>
+                    )}
                     <div style={{ marginBottom: '8px' }}>
                       <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Direction</div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{capitalize(qr.direction ?? 'to venue')}</div>
@@ -195,6 +181,13 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
 
                 {isAccommodation && (
                   <>
+                    {/* Accommodation name shown here in the card, not at the top */}
+                    {qr.accommodationName && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Accommodation</div>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.accommodationName}</div>
+                      </div>
+                    )}
                     <div style={{ marginBottom: '8px' }}>
                       <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '2px' }}>Room type</div>
                       <div style={{ fontSize: '14px', fontWeight: '600', color: '#111' }}>{qr.optionName ?? 'Accommodation'}</div>
@@ -209,7 +202,7 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
                   </>
                 )}
 
-              </div>{/* end left details */}
+              </div>
 
               {/* Right: QR code */}
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
@@ -225,11 +218,11 @@ const TicketDocument = forwardRef<HTMLDivElement, TicketProps>(({ order, event }
                   SCAN ME
                 </div>
                 <div style={{ fontSize: '9px', color: '#9ca3af', marginTop: '4px' }}>{qr.code}</div>
-              </div>{/* end right QR */}
+              </div>
 
-            </div>{/* end card body */}
+            </div>
 
-          </div>/* end card */
+          </div>
         )
       })}
 

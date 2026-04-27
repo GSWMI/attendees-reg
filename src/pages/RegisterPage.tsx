@@ -330,11 +330,11 @@ export default function RegisterPage() {
                   </>
                 )
               })()}
-            </div>F
+            </div>
 
             {/* Payment gateway */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-[13px] text-gray-600 mb-3">Choose a payment gateway</p>
+              <p className="text-[13px] text-gray-600 mb-3">Payment gateway</p>
               <div className="flex items-center gap-4 mb-4">
                 <GatewayOption
                   selected={gateway === 'paystack'}

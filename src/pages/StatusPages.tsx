@@ -8,8 +8,7 @@ import TicketDocument from '../components/TicketDocument'
 import { toPng } from 'html-to-image'
 import jsPDF from 'jspdf'
 
-// ── Please Wait ──────────────────────────────────────────────────────────────
-// This page initiates payment itself so navigation doesn't kill the request
+// ── Please Wait ───────────────────────────────────────────────────────────────
 
 export function PleaseWaitPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -29,18 +28,13 @@ export function PleaseWaitPage() {
 
     initiatePayment(orderId, slug)
       .then((payment) => {
-        console.log('💳 Payment response:', payment)
         if (payment.paymentUrl) {
           window.location.href = payment.paymentUrl
         } else {
-          console.error('No paymentUrl in response:', payment)
           navigate(`/events/s/${slug}/failed`)
         }
       })
-      .catch((err) => {
-        console.error('Payment initiation failed:', err)
-        navigate(`/events/s/${slug}/failed`)
-      })
+      .catch(() => navigate(`/events/s/${slug}/failed`))
   }, [])
 
   return (
@@ -54,7 +48,7 @@ export function PleaseWaitPage() {
   )
 }
 
-// ── Payment Failed ───────────────────────────────────────────────────────────
+// ── Payment Failed ────────────────────────────────────────────────────────────
 
 export function PaymentFailedPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -66,7 +60,7 @@ export function PaymentFailedPage() {
         <h2 className="text-[22px] font-bold text-[#0d1b2a] mb-2">Transaction failed</h2>
         <p className="text-[15px] text-gray-500 mb-10">We were unable to process your transaction. Please try again.</p>
         <button
-          onClick={() => navigate(`/events/s/${slug}/register`)}
+          onClick={() => navigate(slug ? `/events/s/${slug}/register` : '/')}
           className="px-12 py-3.5 bg-[#d32f2f] text-white rounded-lg text-[15px] font-medium hover:bg-[#b71c1c] transition-colors"
         >
           Try again
@@ -76,7 +70,7 @@ export function PaymentFailedPage() {
   )
 }
 
-// ── Payment Verify ───────────────────────────────────────────────────────────
+// ── Payment Verify (slug-based callback) ─────────────────────────────────────
 
 export function PaymentVerifyPage() {
   const [searchParams] = useSearchParams()
@@ -115,7 +109,10 @@ export function PaymentVerifyPage() {
   )
 }
 
-// ── Success ──────────────────────────────────────────────────────────────────
+// ── Success Page ──────────────────────────────────────────────────────────────
+// Used for both:
+//   /events/s/:slug/success?order=ORD-...   (slug-based, after verify)
+//   /payment/success?order=ORD-...           (slug-less, Paystack dashboard callback)
 
 export function SuccessPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -126,40 +123,48 @@ export function SuccessPage() {
   const [downloading, setDownloading] = useState(false)
   const [order, setLocalOrder] = useState<OrderData | null>(ctxOrder)
   const [event, setLocalEvent] = useState<EventData | null>(ctxEvent)
-  const [loading, setLoading] = useState(!ctxOrder)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     const orderNumber = searchParams.get('order')
 
-    // If we already have the order in context use it
-    if (ctxOrder) {
-      setLocalOrder(ctxOrder)
-      setLoading(false)
-    } else if (orderNumber) {
-      // Re-fetch by orderNumber from URL — works after full page reload
-      getOrderByNumber(orderNumber)
-        .then((o) => {
-          setLocalOrder(o)
-          setOrder(o)
-        })
-        .catch(() => navigate(slug ? `/events/s/${slug}` : '/'))
-        .finally(() => setLoading(false))
-    } else {
+    if (!orderNumber) {
+      // No order number at all — go home
       navigate(slug ? `/events/s/${slug}` : '/')
+      return
     }
 
-    // Fetch event — use slug from URL params first, then localStorage fallback
-    if (!ctxEvent) {
-      const eventSlug = slug ?? (() => {
-        try { return localStorage.getItem('gswmi_event_slug') ?? '' } catch { return '' }
-      })()
-      if (eventSlug) {
-        getEventBySlug(eventSlug)
-          .then((e) => { setLocalEvent(e); setEvent(e) })
-          .catch(() => {})
-      }
-    } else {
+    // Always fetch fresh from the API on this page.
+    // Context may be empty after a full page reload (Paystack redirect).
+    getOrderByNumber(orderNumber)
+      .then((o) => {
+        setLocalOrder(o)
+        setOrder(o)
+        setLoading(false)
+      })
+      .catch(() => {
+        // If API fails but we have context order, still show it
+        if (ctxOrder) {
+          setLocalOrder(ctxOrder)
+          setLoading(false)
+        } else {
+          setError(true)
+          setLoading(false)
+        }
+      })
+
+    // Fetch event for the banner and ticket document
+    const eventSlug = slug ?? (() => {
+      try { return localStorage.getItem('gswmi_event_slug') ?? '' } catch { return '' }
+    })()
+
+    if (ctxEvent) {
       setLocalEvent(ctxEvent)
+    } else if (eventSlug) {
+      getEventBySlug(eventSlug)
+        .then((e) => { setLocalEvent(e); setEvent(e) })
+        .catch(() => {})
     }
   }, [])
 
@@ -167,7 +172,6 @@ export function SuccessPage() {
     if (!ticketRef.current || !order) return
     setDownloading(true)
     try {
-      // Wait a tick to ensure hidden ticket is fully rendered
       await new Promise((res) => setTimeout(res, 300))
       const dataUrl = await toPng(ticketRef.current, {
         cacheBust: true,
@@ -175,12 +179,9 @@ export function SuccessPage() {
         pixelRatio: 2,
         skipFonts: true,
         filter: (node) => {
-          // Skip external images that cause CORS issues — QR codes use base64 so they're fine
           if (node instanceof HTMLImageElement) {
             const src = node.getAttribute('src') ?? ''
-            if (src.startsWith('http') && !src.startsWith('data:')) {
-              return false
-            }
+            if (src.startsWith('http') && !src.startsWith('data:')) return false
           }
           return true
         },
@@ -207,7 +208,16 @@ export function SuccessPage() {
     )
   }
 
-  if (!order) return null
+  if (error || !order) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#f5f5f3] px-4">
+        <p className="text-[16px] text-gray-600">Could not load your ticket. Please check your email for your ticket details.</p>
+        <button onClick={() => navigate('/')} className="px-6 py-2.5 bg-[#3b5bdb] text-white rounded-xl text-[14px] font-medium">
+          Go to home
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
@@ -215,13 +225,12 @@ export function SuccessPage() {
       <AnnouncementBanner />
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        {/* Banner */}
-        <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm bg-gradient-to-br from-[#1a2f4a] to-[#2F64E1] flex-shrink-0">
-          {event?.bannerUrl && !event.bannerUrl.startsWith('blob:') && (
+        {event?.bannerUrl && !event.bannerUrl.startsWith('blob:') && (
+          <div className="w-full max-w-[600px] h-[200px] rounded-2xl overflow-hidden mb-8 shadow-sm bg-gradient-to-br from-[#1a2f4a] to-[#2F64E1] flex-shrink-0">
             <img src={event.bannerUrl} alt={event?.name ?? ''} className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="text-center max-w-[480px]">
           <div className="text-[64px] mb-4">🎉</div>
@@ -261,13 +270,21 @@ export function SuccessPage() {
 
       {order && (
         <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}>
-          <TicketDocument ref={ticketRef} order={order} event={event ?? { _id: '', name: '', description: '', startDate: '', endDate: '', totalDays: 1, registrationOpen: true, mealRegistrationOpen: false }} />
+          <TicketDocument
+            ref={ticketRef}
+            order={order}
+            event={event ?? {
+              _id: '', name: '', description: '', startDate: '', endDate: '',
+              totalDays: 1, registrationOpen: true, mealRegistrationOpen: false,
+            }}
+          />
         </div>
       )}
     </div>
   )
 }
 
+// ── Payment Callback (slug-less, Paystack dashboard) ─────────────────────────
 
 export function PaymentCallbackPage() {
   const [searchParams] = useSearchParams()
@@ -285,7 +302,6 @@ export function PaymentCallbackPage() {
         const successStatuses = ['success', 'paid', 'completed', 'successful']
         if (successStatuses.includes(result.status?.toLowerCase())) {
           setOrder(result.order)
-          // Pass orderNumber in URL — no localStorage needed
           const orderNumber = result.order.orderNumber ?? result.order._id ?? ''
           navigate(`/payment/success?order=${encodeURIComponent(orderNumber)}`)
         } else {
