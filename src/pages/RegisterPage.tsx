@@ -5,7 +5,24 @@ import { createOrder } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 
-type Gateway = 'paystack' 
+type Gateway = 'paystack'
+
+// Strip HTML entities from backend-generated strings
+function sanitizeHtml(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
 
 export default function RegisterPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -24,7 +41,6 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Redirect if no event or no selections
   useEffect(() => {
     if (!event) navigate(`/events/s/${slug}`)
   }, [event])
@@ -61,26 +77,24 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const order = await createOrder({
-        eventId: event._id ?? event.id ?? "",
+        eventId: event._id ?? event.id ?? '',
         guest: {
-            firstName: form.firstName,
-            lastName: form.lastName,
-            email: form.email,
-            phone: form.phone,
-            gender: form.gender,
-            nextOfKin: {
-              fullName: form.nokFullName.trim(),
-              email: form.nokEmail.trim(),
-            },
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone,
+          gender: form.gender,
+          nextOfKin: {
+            fullName: form.nokFullName.trim(),
+            email: form.nokEmail.trim(),
           },
+        },
         mealSelections,
         customAnswers: Object.entries(customAnswers).map(([question, answer]) => ({ question, answer })),
         ...(selectedAccommodationId ? { accommodationId: selectedAccommodationId } : {}),
         ...(selectedTransportId ? { transportId: selectedTransportId } : {}),
       })
       setOrder(order)
-
-      // Navigate to please-wait — that page handles payment initiation
       const orderId = order._id ?? (order as { id?: string }).id
       navigate(`/events/s/${slug}/please-wait`, { state: { orderId } })
     } catch (err: unknown) {
@@ -94,18 +108,20 @@ export default function RegisterPage() {
 
   const canCheckout = form.firstName && form.lastName && form.email && form.phone && form.gender && form.nokFullName && form.nokEmail && consent && gateway
 
+  // Sanitize consent text to remove &nbsp; and other HTML entities
+  const cleanConsentText = sanitizeHtml(
+    event.consentText ||
+    'I confirm that the information provided is accurate and I consent to the use of my details for event coordination and logistics purposes.'
+  )
+
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
       <Header />
       <AnnouncementBanner />
 
       <main className="flex-1 max-w-[1000px] mx-auto w-full px-4 py-8">
-        {/* Page title */}
         <div className="flex items-center gap-3 mb-8">
-          <button
-            onClick={() => navigate(`/events/s/${slug}`)}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={() => navigate(`/events/s/${slug}`)} className="text-gray-400 hover:text-gray-600 transition-colors">
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-[22px] font-bold text-[#0d1b2a]">Register & make payment</h1>
@@ -114,66 +130,37 @@ export default function RegisterPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8">
           {/* Left: Form */}
           <div className="flex flex-col gap-5">
-            {/* Personal info */}
-            <FormField
-              label="First name" required
-              error={errors.firstName}
-              icon={<User size={15} className="text-gray-400" />}
-            >
-              <input
-                value={form.firstName}
-                onChange={(e) => update('firstName', e.target.value)}
-                placeholder="First name"
-                className={inputClass(!!errors.firstName)}
-              />
+            <FormField label="First name" required error={errors.firstName} icon={<User size={15} className="text-gray-400" />}>
+              <input value={form.firstName} onChange={(e) => update('firstName', e.target.value)}
+                placeholder="First name" className={inputClass(!!errors.firstName)} />
             </FormField>
 
-            <FormField label="Last name" required error={errors.lastName}
-              icon={<User size={15} className="text-gray-400" />}>
-              <input
-                value={form.lastName}
-                onChange={(e) => update('lastName', e.target.value)}
-                placeholder="Last name"
-                className={inputClass(!!errors.lastName)}
-              />
+            <FormField label="Last name" required error={errors.lastName} icon={<User size={15} className="text-gray-400" />}>
+              <input value={form.lastName} onChange={(e) => update('lastName', e.target.value)}
+                placeholder="Last name" className={inputClass(!!errors.lastName)} />
             </FormField>
 
-            <FormField label="Email address" required error={errors.email}
-              icon={<Mail size={15} className="text-gray-400" />}>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => update('email', e.target.value)}
-                placeholder="Email address"
-                className={inputClass(!!errors.email)}
-              />
+            <FormField label="Email address" required error={errors.email} icon={<Mail size={15} className="text-gray-400" />}>
+              <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)}
+                placeholder="Email address" className={inputClass(!!errors.email)} />
             </FormField>
 
-            <FormField label="WhatsApp phone number" required error={errors.phone}
-              icon={<Phone size={15} className="text-gray-400" />}>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => update('phone', e.target.value)}
-                placeholder="Phone number"
-                className={inputClass(!!errors.phone)}
-              />
+            <FormField label="WhatsApp phone number" required error={errors.phone} icon={<Phone size={15} className="text-gray-400" />}>
+              <input type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)}
+                placeholder="Phone number" className={inputClass(!!errors.phone)} />
             </FormField>
 
             {/* Gender */}
             <FormField label="Gender" required error={errors.gender}>
               <div className="flex gap-3">
                 {(['male', 'female'] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
+                  <button key={g} type="button"
                     onClick={() => { update('gender', g); setErrors((p) => ({ ...p, gender: '' })) }}
                     className={`flex-1 py-3 rounded-lg border text-[14px] font-medium capitalize transition-all ${
                       form.gender === g
                         ? 'border-[#3b5bdb] bg-blue-50/60 text-[#3b5bdb]'
                         : 'border-gray-300 text-gray-600 hover:border-gray-400'
-                    }`}
-                  >
+                    }`}>
                     {g}
                   </button>
                 ))}
@@ -183,24 +170,13 @@ export default function RegisterPage() {
             {/* Next of kin */}
             <div className="rounded-xl border border-gray-200 p-4 flex flex-col gap-4">
               <p className="text-[14px] font-semibold text-gray-800">Next of kin <span className="text-[#3b5bdb] ml-1">*</span></p>
-              <FormField label="Full name" required error={errors.nokFullName}
-                icon={<User size={15} className="text-gray-400" />}>
-                <input
-                  value={form.nokFullName}
-                  onChange={(e) => update('nokFullName', e.target.value)}
-                  placeholder="Full name"
-                  className={inputClass(!!errors.nokFullName)}
-                />
+              <FormField label="Full name" required error={errors.nokFullName} icon={<User size={15} className="text-gray-400" />}>
+                <input value={form.nokFullName} onChange={(e) => update('nokFullName', e.target.value)}
+                  placeholder="Full name" className={inputClass(!!errors.nokFullName)} />
               </FormField>
-              <FormField label="Email address" required error={errors.nokEmail}
-                icon={<Mail size={15} className="text-gray-400" />}>
-                <input
-                  type="email"
-                  value={form.nokEmail}
-                  onChange={(e) => update('nokEmail', e.target.value)}
-                  placeholder="Email address"
-                  className={inputClass(!!errors.nokEmail)}
-                />
+              <FormField label="Email address" required error={errors.nokEmail} icon={<Mail size={15} className="text-gray-400" />}>
+                <input type="email" value={form.nokEmail} onChange={(e) => update('nokEmail', e.target.value)}
+                  placeholder="Email address" className={inputClass(!!errors.nokEmail)} />
               </FormField>
             </div>
 
@@ -229,18 +205,14 @@ export default function RegisterPage() {
               </div>
             ))}
 
-            {/* Consent */}
+            {/* FIX 5: Consent text — sanitized, no more &nbsp; rendering as literal text */}
             <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="consent"
-                checked={consent}
+              <input type="checkbox" id="consent" checked={consent}
                 onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: '' })) }}
-                className="mt-1 w-4 h-4 accent-[#3b5bdb] flex-shrink-0"
-              />
+                className="mt-1 w-4 h-4 accent-[#3b5bdb] flex-shrink-0" />
               <div>
                 <label htmlFor="consent" className="text-[14px] text-gray-700 cursor-pointer leading-relaxed">
-                  {event.consentText || 'I confirm that the information provided is accurate and I consent to the use of my details for event coordination and logistics purposes.'}
+                  {cleanConsentText}
                 </label>
                 <span className="text-[#3b5bdb] ml-1">*</span>
                 {errors.consent && <p className="text-[12px] text-red-500 mt-1">{errors.consent}</p>}
@@ -256,11 +228,8 @@ export default function RegisterPage() {
 
           {/* Right: Order summary + Payment */}
           <div className="flex flex-col gap-4">
-            {/* Order summary card */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="text-[16px] font-bold text-[#3b5bdb] mb-4">Order summary</h2>
-
-              {/* Compute line items */}
               {(() => {
                 const hasMeal = mealSelections.length > 0 && mealSelections.some((s) => s.meals.length > 0)
                 const acc = selectedAccommodationId ? event?.accommodations?.find((a) => a._id === selectedAccommodationId) : null
@@ -271,23 +240,17 @@ export default function RegisterPage() {
 
                 return (
                   <>
-                    {/* Meal line item — only if meal was selected */}
                     {hasMeal && (
                       <>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[14px] text-gray-700">Meal ticket</span>
                           <span className="text-[14px] font-medium text-gray-900">₦{grandTotal.toLocaleString()}</span>
                         </div>
-
-                        {/* Toggle details */}
-                        <button
-                          onClick={() => setShowDetails((v) => !v)}
-                          className="flex items-center gap-1 text-[13px] text-[#3b5bdb] hover:opacity-80 transition-opacity mb-3"
-                        >
+                        <button onClick={() => setShowDetails((v) => !v)}
+                          className="flex items-center gap-1 text-[13px] text-[#3b5bdb] hover:opacity-80 transition-opacity mb-3">
                           {showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           {showDetails ? 'Hide meal details' : 'Show meal details'}
                         </button>
-
                         {showDetails && (
                           <div className="mb-3 pl-2 border-l-2 border-gray-100">
                             {mealSelections.map((sel) => (
@@ -305,24 +268,18 @@ export default function RegisterPage() {
                         )}
                       </>
                     )}
-
-                    {/* Accommodation line item */}
                     {acc && (
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[14px] text-gray-700">Accommodation — {acc.name}</span>
                         <span className="text-[14px] font-medium text-gray-900">₦{accPrice.toLocaleString()}</span>
                       </div>
                     )}
-
-                    {/* Transport line item */}
                     {transport && (
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-[14px] text-gray-700">Transport — {transport.pickupLocation}</span>
                         <span className="text-[14px] font-medium text-gray-900">₦{transportPrice.toLocaleString()}</span>
                       </div>
                     )}
-
-                    {/* Grand total */}
                     <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
                       <span className="text-[14px] font-semibold text-gray-900">Grand total</span>
                       <span className="text-[16px] font-bold text-gray-900">₦{overallTotal.toLocaleString()}</span>
@@ -332,23 +289,16 @@ export default function RegisterPage() {
               })()}
             </div>
 
-            {/* Payment gateway */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-[13px] text-gray-600 mb-3">Payment gateway</p>
+              <p className="text-[13px] text-gray-600 mb-3">Payment Gateway</p>
               <div className="flex items-center gap-4 mb-4">
                 <GatewayOption
                   selected={gateway === 'paystack'}
                   onSelect={() => { setGateway('paystack'); setErrors((p) => ({ ...p, gateway: '' })) }}
                   logo={<PaystackLogo />}
                 />
-                {/* <GatewayOption
-                  selected={gateway === 'flutterwave'}
-                  onSelect={() => { setGateway('flutterwave'); setErrors((p) => ({ ...p, gateway: '' })) }}
-                  logo={<FlutterwaveLogo />}
-                /> */}
               </div>
               {errors.gateway && <p className="text-[12px] text-red-500 mb-3">{errors.gateway}</p>}
-
               <button
                 onClick={handleCheckout}
                 disabled={!canCheckout || loading}
@@ -356,8 +306,7 @@ export default function RegisterPage() {
                   canCheckout && !loading
                     ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
+                }`}>
                 {loading ? 'Processing...' : 'Checkout'}
               </button>
             </div>
@@ -399,12 +348,10 @@ function GatewayOption({ selected, onSelect, logo }: {
   selected: boolean; onSelect: () => void; logo: React.ReactNode
 }) {
   return (
-    <button
-      onClick={onSelect}
+    <button onClick={onSelect}
       className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
         selected ? 'border-[#3b5bdb] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-      }`}
-    >
+      }`}>
       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
         selected ? 'border-[#3b5bdb]' : 'border-gray-300'
       }`}>
@@ -427,14 +374,3 @@ function PaystackLogo() {
     </div>
   )
 }
-
-// function FlutterwaveLogo() {
-//   return (
-//     <div className="flex items-center gap-1.5">
-//       <div className="w-5 h-5 bg-gradient-to-br from-[#f5a623] to-[#e55] rounded-full flex items-center justify-center">
-//         <span className="text-white text-[8px] font-bold">F</span>
-//       </div>
-//       <span className="text-[14px] font-bold text-gray-800">flutterwave</span>
-//     </div>
-//   )
-// }
