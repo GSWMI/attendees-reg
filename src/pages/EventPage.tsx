@@ -6,9 +6,42 @@ import type { AccommodationData, TransportData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatDate(s: string) {
   if (!s) return ''
   return new Date(s).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function sanitizeHtml(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// Hardcoded clean descriptions for events where the admin-entered text
+// has formatting issues that can't be fixed by stripping HTML alone.
+// Key is the event slug.
+const HARDCODED_DESCRIPTIONS: Record<string, string[]> = {
+  'supernatural-retreat-2026-mohtjtc7': [
+    'This is the registration portal for GSWMI Supernatural Retreat, 2026.',
+    'DEPARTURE TO AWE: 27TH MAY, 2026',
+    'ARRIVAL FROM AWE: 30TH MAY, 2026',
+    'Carefully go through the form and fill it in appropriately.',
+    'Ensure you fill in your valid email address as your tickets will be sent to your inbox.',
+    'ALL room rates are FLAT rates and NOT daily rates.',
+    'PREGNANT WOMEN, NURSING MOTHERS, AND CHILDREN ARE NOT ALLOWED IN PNEUMA CITY. PLEASE, WATCH ONLINE.',
+  ],
 }
 
 function TicketCheckbox({ checked }: { checked: boolean }) {
@@ -88,7 +121,6 @@ export default function EventPage() {
     )
   }
 
-  // Past event guard
   const isPast = event.endDate && new Date(event.endDate) < new Date()
   if (isPast) {
     return (
@@ -121,8 +153,6 @@ export default function EventPage() {
   const hasSelections = mealSelections.length > 0 && mealSelections.some((s) => s.meals.length > 0)
   const accommodations: AccommodationData[] = event.accommodations ?? []
   const transports: TransportData[] = event.transport ?? []
-  const selectedAcc = accommodations.find((a) => a._id === selectedAccommodationId)
-  const selectedTransport = transports.find((t) => t._id === selectedTransportId)
   const hasMeal = event.mealRegistrationOpen && event.mealOptions && event.mealOptions.length > 0
   const hasAccommodation = event.accommodationRegistrationOpen && accommodations.length > 0
   const hasTransport = event.transportRegistrationOpen && transports.length > 0
@@ -133,25 +163,17 @@ export default function EventPage() {
     return `https://www.google.com/maps/search/${encodeURIComponent(event.location)}`
   }
 
-  const handleMealCheck = () => {
-    const next = !mealChecked
-    setMealChecked(next)
-    setMealOpen(next)
-  }
+  const handleMealCheck = () => { const n = !mealChecked; setMealChecked(n); setMealOpen(n) }
+  const handleAccCheck = () => { const n = !accChecked; setAccChecked(n); setAccOpen(n); if (!n) setSelectedAccommodationId('') }
+  const handleTransportCheck = () => { const n = !transportChecked; setTransportChecked(n); setTransportOpen(n); if (!n) setSelectedTransportId('') }
 
-  const handleAccCheck = () => {
-    const next = !accChecked
-    setAccChecked(next)
-    setAccOpen(next)
-    if (!next) setSelectedAccommodationId('')
-  }
+  // Use hardcoded lines for known broken slugs, otherwise sanitize from API
+  const descLines: string[] = slug && HARDCODED_DESCRIPTIONS[slug]
+    ? HARDCODED_DESCRIPTIONS[slug]
+    : sanitizeHtml(event.description ?? '').split('\n').filter((l) => l.trim())
 
-  const handleTransportCheck = () => {
-    const next = !transportChecked
-    setTransportChecked(next)
-    setTransportOpen(next)
-    if (!next) setSelectedTransportId('')
-  }
+  // This image is a tall portrait format — use object-contain so full image shows
+  const isTallImage = slug === 'supernatural-retreat-2026-mohtjtc7'
 
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
@@ -162,45 +184,67 @@ export default function EventPage() {
 
         {/* Event hero card */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2">
-            <div className="overflow-hidden h-[220px] md:h-[280px] flex-shrink-0">
-              {event.bannerUrl && !event.bannerUrl.startsWith('blob:') ? (
-                <img src={event.bannerUrl} alt={event.name} className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb] min-h-[220px]" />
-              )}
+
+          {/* Banner */}
+          {event.bannerUrl && !event.bannerUrl.startsWith('blob:') ? (
+            <div
+              className={`w-full flex items-center justify-center ${isTallImage ? 'bg-black' : 'bg-[#0d1b2a]'}`}
+              style={{ height: isTallImage ? undefined : undefined }}
+            >
+              <img
+                src={event.bannerUrl}
+                alt={event.name}
+                className={`w-full ${
+                  isTallImage
+                    // Tall/portrait image: contain so full image shows, let height be natural
+                    ? 'max-h-[600px] object-contain'
+                    // Normal landscape banners: cover at fixed height
+                    : 'h-[220px] md:h-[340px] object-cover object-top'
+                }`}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
             </div>
-            <div className="p-6 md:p-8 flex flex-col justify-center gap-4 md:h-[280px] overflow-y-auto">
-              <h1 className="text-3xl md:text-4xl font-bold text-[#0d1b2a] leading-tight">{event.name}</h1>
-              {event.description && (
-                <div className="text-[14px] text-gray-600 leading-relaxed">
-                  <p className={descExpanded ? '' : 'line-clamp-4'}>{event.description}</p>
-                  {event.description.length > 200 && (
-                    <button onClick={() => setDescExpanded((v) => !v)}
-                      className="text-[#3b5bdb] text-[13px] hover:underline mt-1">
-                      {descExpanded ? 'Show less' : 'Read more'}
-                    </button>
-                  )}
+          ) : (
+            <div className="w-full h-[140px] bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb]" />
+          )}
+
+          {/* Info */}
+          <div className="p-6 md:p-8 flex flex-col gap-4">
+            <h1 className="text-2xl md:text-3xl font-bold text-[#0d1b2a] leading-tight">{event.name}</h1>
+
+            {descLines.length > 0 && (
+              <div className="text-[14px] text-gray-600 leading-relaxed">
+                <div className={descExpanded ? '' : 'line-clamp-4'}>
+                  {descLines.map((line, i) => (
+                    <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{line}</p>
+                  ))}
                 </div>
-              )}
-              <div className="flex items-center gap-2 text-[13px] text-gray-700">
-                <svg className="text-[#3b5bdb] flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                <span>{formatDate(event.startDate)}{event.endDate ? ` – ${formatDate(event.endDate)}` : ''}</span>
+                {descLines.length > 4 && (
+                  <button onClick={() => setDescExpanded((v) => !v)}
+                    className="text-[#3b5bdb] text-[13px] hover:underline mt-2">
+                    {descExpanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
               </div>
-              {event.location && (
-                <a href={getMapsUrl()} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:border-[#3b5bdb] hover:bg-blue-50 transition-colors group w-fit">
-                  <MapPin size={14} className="text-[#3b5bdb] flex-shrink-0" />
-                  <span className="text-[13px] text-gray-700 font-medium">{event.location}</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 group-hover:text-[#3b5bdb] transition-colors flex-shrink-0">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-                  </svg>
-                </a>
-              )}
+            )}
+
+            <div className="flex items-center gap-2 text-[13px] text-gray-700">
+              <svg className="text-[#3b5bdb] flex-shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span>{formatDate(event.startDate)}{event.endDate ? ` – ${formatDate(event.endDate)}` : ''}</span>
             </div>
+
+            {event.location && (
+              <a href={getMapsUrl()} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 hover:border-[#3b5bdb] hover:bg-blue-50 transition-colors group w-fit">
+                <MapPin size={14} className="text-[#3b5bdb] flex-shrink-0" />
+                <span className="text-[13px] text-gray-700 font-medium">{event.location}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 group-hover:text-[#3b5bdb] transition-colors flex-shrink-0">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            )}
           </div>
         </div>
 
@@ -217,7 +261,6 @@ export default function EventPage() {
           </div>
         )}
 
-        {/* Guard: no ticket types enabled */}
         {event.registrationOpen && !hasMeal && !hasAccommodation && !hasTransport && (
           <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 mb-4 flex items-start gap-3">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 flex-shrink-0 mt-0.5">
@@ -233,7 +276,7 @@ export default function EventPage() {
         {/* Ticket sections */}
         <div className="flex flex-col gap-4 mb-8">
 
-          {/* ── Meal ticket ── */}
+          {/* Meal ticket */}
           {hasMeal && (
             <div className="rounded-2xl border border-gray-200 overflow-hidden" style={{ backgroundColor: '#FAFCFF' }}>
               <div className="flex items-center justify-between px-5 py-4">
@@ -267,18 +310,14 @@ export default function EventPage() {
                       onSelect={selectOption}
                     />
                   ) : (
-                    <MealSummary
-                      mealSelections={mealSelections}
-                      grandTotal={grandTotal}
-                      hasSelections={hasSelections}
-                    />
+                    <MealSummary mealSelections={mealSelections} grandTotal={grandTotal} hasSelections={hasSelections} />
                   )}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Accommodation ticket ── */}
+          {/* Accommodation ticket */}
           {hasAccommodation && (
             <div className="rounded-2xl border border-gray-200" style={{ backgroundColor: '#FAFCFF' }}>
               <div className="flex items-center justify-between px-5 py-4">
@@ -291,65 +330,58 @@ export default function EventPage() {
                   {accOpen ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
                 </button>
               </div>
-
               {accChecked && accOpen && (
                 <div className="border-t border-gray-200 p-5 bg-white rounded-b-2xl">
                   <p className="text-[13px] font-medium text-gray-600 mb-1">Accommodation options</p>
                   <p className="text-[12px] text-gray-400 mb-3 italic">Flat rate applies to all accommodation options for the duration of the event.</p>
-
-                  {/* Inline radio options — no dropdown clipping issues */}
-                  <div className="flex flex-col gap-2 mb-3">
-                    {accommodations.map((acc) => (
-                      <button key={acc._id} type="button"
-                        onClick={() => setSelectedAccommodationId(acc._id)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
-                          selectedAccommodationId === acc._id
-                            ? 'border-[#3b5bdb] bg-blue-50/60'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                            selectedAccommodationId === acc._id ? 'border-[#3b5bdb]' : 'border-gray-300'
-                          }`}>
-                            {selectedAccommodationId === acc._id && (
-                              <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />
-                            )}
-                          </div>
-                          <span className="text-[13px] text-gray-700">{acc.name}</span>
+                  <div className="flex flex-col gap-2">
+                    {accommodations.map((acc) => {
+                      const isSelected = selectedAccommodationId === acc._id
+                      const cleanDesc = sanitizeHtml(acc.description ?? '')
+                      return (
+                        <div key={acc._id}>
+                          <button type="button" onClick={() => setSelectedAccommodationId(acc._id)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
+                              isSelected ? 'border-[#3b5bdb] bg-blue-50/60' : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? 'border-[#3b5bdb]' : 'border-gray-300'}`}>
+                                {isSelected && <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />}
+                              </div>
+                              <span className="text-[13px] text-gray-700">{acc.name}</span>
+                            </div>
+                            <span className="text-[13px] font-medium text-gray-600 whitespace-nowrap ml-3">₦{acc.price.toLocaleString()}</span>
+                          </button>
+                          {isSelected && (
+                            <div className="mx-1 mb-1 bg-blue-50/60 border border-blue-100 border-t-0 rounded-b-xl px-4 py-3 space-y-2">
+                              {cleanDesc && <p className="text-[13px] text-gray-600">{cleanDesc}</p>}
+                              <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                                <Users size={14} className="flex-shrink-0" />
+                                <span>Per room: {acc.peoplePerRoom} {acc.peoplePerRoom === 1 ? 'person' : 'people'}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                                <Hash size={14} className="flex-shrink-0" />
+                                <span>Price: ₦{acc.price.toLocaleString()}</span>
+                              </div>
+                              {acc.amenities && acc.amenities.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {acc.amenities.map((a) => (
+                                    <span key={a} className="px-2 py-0.5 bg-white border border-blue-100 rounded-full text-[11px] text-blue-600">{a}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[13px] font-medium text-gray-600">₦{acc.price.toLocaleString()}</span>
-                      </button>
-                    ))}
+                      )
+                    })}
                   </div>
-
-                  {/* Selected option details */}
-                  {selectedAcc && (
-                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl px-4 py-3 space-y-2">
-                      {selectedAcc.description && <p className="text-[13px] text-gray-600">{selectedAcc.description}</p>}
-                      <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Users size={14} className="flex-shrink-0" />
-                        <span>Per room: {selectedAcc.peoplePerRoom} {selectedAcc.peoplePerRoom === 1 ? 'person' : 'people'}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Hash size={14} className="flex-shrink-0" />
-                        <span>Price: ₦{selectedAcc.price.toLocaleString()}</span>
-                      </div>
-                      {selectedAcc.amenities && selectedAcc.amenities.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {selectedAcc.amenities.map((a) => (
-                            <span key={a} className="px-2 py-0.5 bg-white border border-blue-100 rounded-full text-[11px] text-blue-600">{a}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Transportation ticket ── */}
+          {/* Transportation ticket */}
           {hasTransport && (
             <div className="rounded-2xl border border-gray-200" style={{ backgroundColor: '#FAFCFF' }}>
               <div className="flex items-center justify-between px-5 py-4">
@@ -362,63 +394,56 @@ export default function EventPage() {
                   {transportOpen ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
                 </button>
               </div>
-
               {transportChecked && transportOpen && (
                 <div className="border-t border-gray-200 p-5 bg-white rounded-b-2xl">
                   <p className="text-[13px] font-medium text-gray-600 mb-1">Pickup location</p>
                   <p className="text-[12px] text-gray-400 mb-3 italic">Flat rate applies to all pickup options for the duration of the event.</p>
-
-                  {/* Inline radio options */}
                   <div className="flex flex-col gap-2 mb-3">
-                    {transports.map((t) => (
-                      <button key={t._id} type="button"
-                        onClick={() => setSelectedTransportId(t._id)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
-                          selectedTransportId === t._id
-                            ? 'border-[#3b5bdb] bg-blue-50/60'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                            selectedTransportId === t._id ? 'border-[#3b5bdb]' : 'border-gray-300'
-                          }`}>
-                            {selectedTransportId === t._id && (
-                              <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />
-                            )}
-                          </div>
-                          <span className="text-[13px] text-gray-700">{t.pickupLocation}</span>
+                    {transports.map((t) => {
+                      const isSelected = selectedTransportId === t._id
+                      const cleanDesc = sanitizeHtml(t.description ?? '')
+                      return (
+                        <div key={t._id}>
+                          <button type="button" onClick={() => setSelectedTransportId(t._id)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
+                              isSelected ? 'border-[#3b5bdb] bg-blue-50/60' : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? 'border-[#3b5bdb]' : 'border-gray-300'}`}>
+                                {isSelected && <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />}
+                              </div>
+                              <span className="text-[13px] text-gray-700">{t.pickupLocation}</span>
+                            </div>
+                            <span className="text-[13px] font-medium text-gray-600 whitespace-nowrap ml-3">₦{t.price.toLocaleString()}</span>
+                          </button>
+                          {isSelected && cleanDesc && (
+                            <div className="mx-1 mb-1 bg-gray-50 border border-gray-100 border-t-0 rounded-b-xl px-4 py-3">
+                              <p className="text-[13px] text-gray-600">{cleanDesc}</p>
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[13px] font-medium text-gray-600">₦{t.price.toLocaleString()}</span>
-                      </button>
-                    ))}
+                      )
+                    })}
                   </div>
-
-                  {/* Selected pickup details */}
-                  {selectedTransport && (
-                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-[13px] font-medium text-gray-800">{selectedTransport.pickupLocation}</p>
-                        {selectedTransport.dropoffLocation && (
-                          <p className="text-[12px] text-gray-400 mt-0.5">Drop-off: {selectedTransport.dropoffLocation}</p>
-                        )}
-                      </div>
-                      <span className="text-[14px] font-semibold text-gray-800">₦{selectedTransport.price.toLocaleString()}</span>
-                    </div>
-                  )}
+                  <div className="rounded-xl px-4 py-3 mt-2" style={{ backgroundColor: '#FEF0C7' }}>
+                    <p className="text-[13px] text-[#92400E] leading-relaxed">
+  1. Pick-Up from Iwo Road / Moniya Train Station (Morning Train) / Ace Supermarket on the 27th.<br />
+  2. Drop off at Iwo Road / Moniya Train Station. <br />
+  3. To and Fro Baptist for the daily programs.<br />
+  Kindly note there is limited space in the buses. To this effect, if you are mobile, please drive.
+</p>
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Single Proceed to checkout button */}
         <button
           onClick={() => navigate(`/events/s/${slug}/register`)}
           disabled={!canProceed}
           className={`w-full py-3.5 rounded-xl text-[15px] font-semibold transition-all flex items-center justify-center gap-2 ${
-            canProceed
-              ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            canProceed ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
           Proceed to checkout
@@ -448,14 +473,13 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
 
   return (
     <div className="bg-white">
-      {/* Desktop: table layout */}
-      <div className="hidden md:block p-5 overflow-x-auto">
-        <table className="w-full min-w-[500px]">
+      <div className="hidden md:block p-5">
+        <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left text-[12px] text-gray-500 font-medium pb-3 w-24">Slot</th>
+              <th className="text-left text-[12px] text-gray-500 font-medium pb-3 w-20">Slot</th>
               <th className="text-left text-[12px] text-gray-500 font-medium pb-3">Meal option × Price</th>
-              <th className="text-right text-[12px] text-gray-500 font-medium pb-3 whitespace-nowrap">Quantity (Max. 5 packs)</th>
+              <th className="text-right text-[12px] text-gray-500 font-medium pb-3 w-40">Qty (Max. 5)</th>
             </tr>
           </thead>
           <tbody>
@@ -466,16 +490,16 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
               return (
                 <tr key={group.slot} className="border-b border-gray-50 last:border-0">
                   <td className="py-4 text-[13px] font-medium text-gray-800 capitalize align-top">{group.slot}</td>
-                  <td className="py-4">
+                  <td className="py-4 pr-4">
                     {group.options.map((opt, i) => (
-                      <label key={i} className="flex items-center gap-2 mb-2 last:mb-0 cursor-pointer group">
+                      <label key={i} className="flex items-start gap-2 mb-2 last:mb-0 cursor-pointer group">
                         <input type="radio" name={`slot-${day}-${group.slot}`}
                           checked={selected?.optionIndex === i}
                           onChange={() => onSelect(day, group.slot, i)}
-                          className="accent-[#3b5bdb] w-4 h-4 flex-shrink-0" />
-                        <span className="text-[13px] text-gray-600 truncate max-w-[200px] group-hover:text-gray-900 transition-colors">{opt.name}</span>
-                        <span className="text-[12px] text-gray-400">–</span>
-                        <span className="text-[13px] text-gray-800 font-medium whitespace-nowrap">₦{opt.price.toLocaleString()}</span>
+                          className="accent-[#3b5bdb] w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span className="text-[13px] text-gray-600 group-hover:text-gray-900 transition-colors leading-snug">{opt.name}</span>
+                        <span className="text-[12px] text-gray-400 flex-shrink-0">–</span>
+                        <span className="text-[13px] text-gray-800 font-medium whitespace-nowrap flex-shrink-0">₦{opt.price.toLocaleString()}</span>
                       </label>
                     ))}
                   </td>
@@ -490,7 +514,6 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
                         className="w-7 h-7 rounded-full border border-[#3b5bdb] text-[#3b5bdb] flex items-center justify-center hover:bg-blue-50 transition-colors">
                         <Plus size={12} />
                       </button>
-                      <span className="text-[12px] text-gray-400">packs</span>
                     </div>
                   </td>
                 </tr>
@@ -500,7 +523,6 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
         </table>
       </div>
 
-      {/* Mobile: card layout — no horizontal scrolling */}
       <div className="md:hidden flex flex-col divide-y divide-gray-100">
         {mealGroups.map((group) => {
           const selected = quantities[day]?.[group.slot]
@@ -508,23 +530,15 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
           const selectedIdx = selected?.optionIndex ?? 0
           return (
             <div key={group.slot} className="p-4">
-              {/* Slot label */}
-              <div className="text-[12px] font-bold text-[#3b5bdb] uppercase tracking-wide mb-3 capitalize">
-                {group.slot}
-              </div>
-              {/* Options */}
+              <div className="text-[12px] font-bold text-[#3b5bdb] uppercase tracking-wide mb-3 capitalize">{group.slot}</div>
               <div className="flex flex-col gap-2 mb-4">
                 {group.options.map((opt, i) => (
                   <label key={i} onClick={() => onSelect(day, group.slot, i)}
                     className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                      selected?.optionIndex === i
-                        ? 'border-[#3b5bdb] bg-blue-50/60'
-                        : 'border-gray-200 bg-white'
+                      selected?.optionIndex === i ? 'border-[#3b5bdb] bg-blue-50/60' : 'border-gray-200 bg-white'
                     }`}>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                        selected?.optionIndex === i ? 'border-[#3b5bdb]' : 'border-gray-300'
-                      }`}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${selected?.optionIndex === i ? 'border-[#3b5bdb]' : 'border-gray-300'}`}>
                         {selected?.optionIndex === i && <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />}
                       </div>
                       <span className="text-[13px] text-gray-700">{opt.name}</span>
@@ -533,7 +547,6 @@ function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
                   </label>
                 ))}
               </div>
-              {/* Quantity row */}
               <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
                 <span className="text-[13px] text-gray-600">Quantity <span className="text-[11px] text-gray-400">(max 5)</span></span>
                 <div className="flex items-center gap-4">
@@ -591,7 +604,7 @@ function MealSummary({ mealSelections, grandTotal, hasSelections }: {
                     {sel.meals.map((meal, i) => (
                       <tr key={i} className="border-b border-gray-50">
                         <td className="py-2 text-[13px] text-gray-700 capitalize">{meal.slot}</td>
-                        <td className="py-2 text-[13px] text-gray-700 max-w-[160px] truncate">{meal.optionName}</td>
+                        <td className="py-2 text-[13px] text-gray-700">{meal.optionName}</td>
                         <td className="py-2 text-[13px] text-gray-700">{meal.quantity}</td>
                         <td className="py-2 text-[13px] text-gray-700">₦{meal.price.toLocaleString()}</td>
                         <td className="py-2 text-[13px] text-gray-700 text-right">₦{(meal.price * meal.quantity).toLocaleString()}</td>

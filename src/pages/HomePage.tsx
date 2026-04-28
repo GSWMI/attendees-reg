@@ -14,6 +14,22 @@ function isUpcoming(event: EventData) {
   return new Date(event.endDate) >= new Date()
 }
 
+function sanitizeHtml(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/p>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 export default function HomePage() {
   const navigate = useNavigate()
   const [events, setEvents] = useState<EventData[]>([])
@@ -66,24 +82,29 @@ export default function HomePage() {
                 className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:border-[#3b5bdb] hover:shadow-md transition-all text-left w-full"
               >
                 <div className="flex flex-col sm:flex-row">
-                  {/* Banner */}
-                  <div className="w-full sm:w-[180px] h-[180px] sm:h-[130px] flex-shrink-0 bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb]">
-                    {event.bannerUrl && !event.bannerUrl.startsWith('blob:') && (
+                  {/* Thumbnail — dark background + object-contain works for both
+                      landscape and portrait images without cropping or squishing */}
+                  <div className="w-full sm:w-[200px] h-[180px] sm:h-[140px] flex-shrink-0 bg-[#0d1b2a] flex items-center justify-center overflow-hidden">
+                    {event.bannerUrl && !event.bannerUrl.startsWith('blob:') ? (
                       <img
                         src={event.bannerUrl}
                         alt={event.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[#1a2f4a] to-[#3b5bdb]" />
                     )}
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 p-5 flex flex-col justify-center gap-2">
+                  <div className="flex-1 p-5 flex flex-col justify-center gap-2 min-w-0">
                     <h2 className="text-[16px] font-semibold text-[#0d1b2a]">{event.name}</h2>
 
                     {event.description && (
-                      <p className="text-[13px] text-gray-500 line-clamp-2">{event.description}</p>
+                      <p className="text-[13px] text-gray-500 line-clamp-2">
+                        {sanitizeHtml(event.description)}
+                      </p>
                     )}
 
                     <div className="flex flex-wrap items-center gap-4 mt-1">
