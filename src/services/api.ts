@@ -1,5 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://ticket-booking-dev.onrender.com/api'
-const SITE_URL = 'https://gswmi-attendee.netlify.app/'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://gswmi-backend.onrender.com/api'
+const SITE_URL = 'https://events.gswmi.com/'
 
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

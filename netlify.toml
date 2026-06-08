@@ -1,6 +1,6 @@
 [[redirects]]
   from = "/api/*"
-  to = "https://ticket-booking-dev.onrender.com/api/:splat"
+  to = "https://gswmi-backend.onrender.com/api/:splat"
   status = 200
   force = true
 
