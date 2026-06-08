@@ -425,14 +425,14 @@ export default function EventPage() {
                       )
                     })}
                   </div>
-                  <div className="rounded-xl px-4 py-3 mt-2" style={{ backgroundColor: '#FEF0C7' }}>
+                  {/* <div className="rounded-xl px-4 py-3 mt-2" style={{ backgroundColor: '#FEF0C7' }}>
                     <p className="text-[13px] text-[#92400E] leading-relaxed">
   1. Pick-Up from Iwo Road / Moniya Train Station (Morning Train) / Ace Supermarket on the 27th.<br />
   2. Drop off at Iwo Road / Moniya Train Station. <br />
   3. To and Fro Baptist for the daily programs.<br />
   Kindly note there is limited space in the buses. To this effect, if you are mobile, please drive.
 </p>
-                  </div>
+                  </div> */}
                 </div>
               )}
             </div>
