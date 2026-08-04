@@ -26,7 +26,7 @@ export function PleaseWaitPage() {
       return
     }
 
-    initiatePayment(orderId, slug)
+    initiatePayment('order', orderId, slug)
       .then((payment) => {
         if (payment.paymentUrl) {
           window.location.href = payment.paymentUrl
@@ -86,8 +86,10 @@ export function PaymentVerifyPage() {
     }
     verifyPayment(reference)
       .then((result) => {
-        const successStatuses = ['success', 'paid', 'completed', 'successful']
-        if (successStatuses.includes(result.status?.toLowerCase())) {
+        const ok = ['success', 'paid', 'completed', 'successful'].includes(result.status?.toLowerCase())
+        if (ok && result.sponsorship) {
+          navigate(`/events/s/${slug}/sponsor/success`)
+        } else if (ok && result.order) {
           setOrder(result.order)
           const orderNum = result.order.orderNumber ?? result.order._id ?? ''
           navigate(`/events/s/${slug}/success?order=${encodeURIComponent(orderNum)}`)
@@ -117,7 +119,7 @@ export function PaymentVerifyPage() {
 export function SuccessPage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
-  const { event: ctxEvent, order: ctxOrder, setOrder, setEvent } = useRegistration()
+  const { event: ctxEvent, order: ctxOrder, setOrder, setEvent, resetRegistration } = useRegistration()
   const navigate = useNavigate()
   const ticketRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
@@ -125,6 +127,9 @@ export function SuccessPage() {
   const [event, setLocalEvent] = useState<EventData | null>(ctxEvent)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  // A completed order — wipe the draft so a fresh registration starts clean.
+  useEffect(() => { resetRegistration() }, [])
 
   useEffect(() => {
     const orderNumber = searchParams.get('order')
@@ -318,7 +323,7 @@ export function PaymentCallbackPage() {
     verifyPayment(reference)
       .then((result) => {
         const successStatuses = ['success', 'paid', 'completed', 'successful']
-        if (successStatuses.includes(result.status?.toLowerCase())) {
+        if (successStatuses.includes(result.status?.toLowerCase()) && result.order) {
           setOrder(result.order)
           const orderNumber = result.order.orderNumber ?? result.order._id ?? ''
           navigate(`/payment/success?order=${encodeURIComponent(orderNumber)}`)
@@ -336,6 +341,44 @@ export function PaymentCallbackPage() {
         <h2 className="text-[22px] font-bold text-[#0d1b2a] mb-2">Verifying payment</h2>
         <p className="text-[15px] text-gray-500">Please wait while we confirm your payment...</p>
       </div>
+    </div>
+  )
+}
+
+// ── Sponsorship Success ───────────────────────────────────────────────────────
+
+export function SponsorSuccessPage() {
+  const { slug } = useParams<{ slug: string }>()
+  const navigate = useNavigate()
+  const { event, resetRegistration } = useRegistration()
+
+  // A completed sponsorship — wipe the draft so a fresh journey starts clean.
+  useEffect(() => { resetRegistration() }, [])
+
+  return (
+    <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
+      <Header />
+      <AnnouncementBanner />
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+        <div className="text-center max-w-[480px]">
+          <div className="text-[64px] mb-4">🎉</div>
+          <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Thank you for sponsoring!</h2>
+          <p className="text-[15px] text-gray-600 mb-2">
+            Your sponsorship of {event?.name ?? 'this event'} has been received.
+          </p>
+          <p className="text-[14px] text-gray-400 mb-8">
+            A receipt of your payment has been sent to your email address.
+          </p>
+          <button
+            onClick={() => navigate(slug ? `/events/s/${slug}` : '/')}
+            className="px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold"
+            style={{ backgroundColor: '#2F64E1' }}
+          >
+            Done
+          </button>
+        </div>
+      </main>
+      <Footer />
     </div>
   )
 }

@@ -11,9 +11,11 @@ export default function ReviewPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const {
-    event, mealSelections, grandTotal, selectedAccommodationId, selectedTransportId,
-    guest, customAnswers, setOrder,
+    event, mode, mealSelections, grandTotal, selectedAccommodationId, selectedTransportId,
+    guest, purchaser, customAnswers, setOrder,
   } = useRegistration()
+
+  const isSomeoneElse = mode === 'someone-else'
 
   const [gateway, setGateway] = useState<Gateway | null>('paystack')
   const [loading, setLoading] = useState(false)
@@ -66,6 +68,14 @@ export default function ReviewPage() {
             whatsappNumber: guest.nokWhatsappNumber.trim(),
           },
         },
+        ...(isSomeoneElse && purchaser.email ? {
+          purchaser: {
+            firstName: purchaser.firstName.trim(),
+            lastName: purchaser.lastName.trim(),
+            email: purchaser.email.trim(),
+            phone: purchaser.phone.trim(),
+          },
+        } : {}),
         mealSelections,
         customAnswers: Object.entries(customAnswers).map(([question, answer]) => ({ question, answer })),
         ...(selectedAccommodationId ? { accommodationId: selectedAccommodationId } : {}),
@@ -139,8 +149,19 @@ export default function ReviewPage() {
               )}
             </SectionCard>
 
-            {/* Attendee details */}
-            <SectionCard title="Your details" onEdit={editDetails}>
+            {/* Payer (someone-else flow) */}
+            {isSomeoneElse && (
+              <SectionCard title="Payer (receipt recipient)" onEdit={editDetails}>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                  <Detail label="Name" value={`${purchaser.firstName} ${purchaser.lastName}`} />
+                  <Detail label="Email" value={purchaser.email} />
+                  <Detail label="Phone number" value={purchaser.phone} />
+                </dl>
+              </SectionCard>
+            )}
+
+            {/* Attendee / recipient details */}
+            <SectionCard title={isSomeoneElse ? "Attendee's details" : 'Your details'} onEdit={editDetails}>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                 <Detail label="Name" value={`${guest.firstName} ${guest.lastName}`} />
                 <Detail label="Email" value={guest.email} />

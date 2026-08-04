@@ -84,6 +84,14 @@ export interface EventData {
   transportRegistrationOpen?: boolean
   accommodations?: AccommodationData[]
   transport?: TransportData[]
+  // Per-person unit prices for Specific Sponsorship. Set once by the admin on
+  // the event. PENDING BACKEND — the UI falls back to placeholders until this
+  // is returned by GET /events/s/:slug.
+  sponsorshipUnitPrices?: {
+    meal?: number
+    transport?: number
+    accommodation?: { accommodationId: string; name: string; pricePerPerson: number }[]
+  }
 }
 
 // GET /events/s/:slug
@@ -133,6 +141,15 @@ export interface MealSelection {
   }[]
 }
 
+// Payer details — present when someone pays for another registrant.
+// Receipts go to the purchaser; the ticket goes to the guest.
+export interface PurchaserData {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+}
+
 export interface CreateOrderPayload {
   eventId: string
   guest: {
@@ -144,6 +161,7 @@ export interface CreateOrderPayload {
     gender: string
     nextOfKin: { fullName: string; email: string; phone: string; whatsappNumber: string }
   }
+  purchaser?: PurchaserData
   mealSelections: MealSelection[]
   customAnswers: { question: string; answer: string }[]
   accommodationId?: string
@@ -204,36 +222,96 @@ export async function calculateOrder(
   return data.data ?? (data as unknown as { totalAmount: number; breakdown: Record<string, number> })
 }
 
-// POST /orders/:orderId/pay
+// Payment is now handled by a context-aware router that serves both orders and
+// sponsorships (replaces the old /orders/:id/pay path).
+export type PaymentContext = 'order' | 'sponsorship'
+
+// POST /payments/:context/:resourceId/pay
 // Response: { success, data: { authorizationUrl, accessCode, reference } }
 export async function initiatePayment(
-  orderId: string,
-  slug: string
+  context: PaymentContext,
+  resourceId: string,
+  slug?: string
 ): Promise<{ paymentUrl: string; reference: string }> {
-  const callbackUrl = `${SITE_URL}/events/s/${slug}/verify`
-  const raw = await request<{ success: boolean; data: Record<string, unknown> }>(`/orders/${orderId}/pay`, {
-    method: 'POST',
-    body: JSON.stringify({ callbackUrl }),
-  })
+  // Slug-based verify page for the event flow; slug-less callback otherwise.
+  const callbackUrl = slug
+    ? `${SITE_URL}/events/s/${slug}/verify`
+    : `${SITE_URL}/payment/callback`
+  const raw = await request<{ success: boolean; data: Record<string, unknown> }>(
+    `/payments/${context}/${resourceId}/pay`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ callbackUrl }),
+    }
+  )
   const inner = raw.data ?? (raw as unknown as Record<string, unknown>)
   const paymentUrl = String(inner.authorizationUrl ?? inner.paymentUrl ?? inner.authorization_url ?? '')
   const reference = String(inner.reference ?? inner.accessCode ?? '')
   return { paymentUrl, reference }
 }
 
-// GET /orders/verify/:reference
-// Response: { success, data: { order: { id, status, paymentStatus, qrCodes, ... } } }
+// GET /payments/verify/:reference
+// The reference already carries its context, so we don't pass it again.
+// For an order context, data holds the order; for sponsorship, the sponsorship.
 export async function verifyPayment(
   reference: string
-): Promise<{ status: string; order: OrderData }> {
-  const data = await request<{ success: boolean; data: { order: Record<string, unknown> } }>(
-    `/orders/verify/${reference}`
+): Promise<{ status: string; order?: OrderData; sponsorship?: SponsorshipData }> {
+  const data = await request<{ success: boolean; data: Record<string, unknown> }>(
+    `/payments/verify/${reference}`
   )
-  const inner = data.data ?? (data as unknown as { order: Record<string, unknown> })
-  const rawOrder = (inner as { order?: Record<string, unknown> }).order ?? (inner as Record<string, unknown>)
-  const order = normalizeId(rawOrder as Record<string, unknown>) as unknown as OrderData
+  const inner = (data.data ?? (data as unknown as Record<string, unknown>)) as Record<string, unknown>
+
+  // Sponsorship result
+  if (inner.sponsorship || inner.sponsorshipType) {
+    const rawSp = (inner.sponsorship ?? inner) as Record<string, unknown>
+    const sponsorship = normalizeId(rawSp) as unknown as SponsorshipData
+    const status = String(rawSp.status ?? rawSp.paymentStatus ?? 'unknown')
+    return { status, sponsorship }
+  }
+
+  // Order result (default)
+  const rawOrder = (inner.order ?? inner) as Record<string, unknown>
+  const order = normalizeId(rawOrder) as unknown as OrderData
   const status = String(rawOrder.status ?? rawOrder.paymentStatus ?? 'unknown')
   return { status, order }
+}
+
+// ── Sponsorship ─────────────────────────────────────────────────────────────
+
+export type SponsorshipType = 'general' | 'specific'
+export type SponsorshipCategory = 'meal' | 'accommodation' | 'transport'
+
+export interface CreateSponsorshipPayload {
+  eventId: string
+  sponsor: { name: string; email: string; phone: string }
+  sponsorshipType: SponsorshipType
+  category?: SponsorshipCategory // required when sponsorshipType === 'specific'
+  numberOfPersons?: number
+  amount: number
+}
+
+export interface SponsorshipData {
+  _id: string
+  id?: string
+  status?: string
+  paymentStatus?: string
+  eventId: string
+  sponsor: { name: string; email: string; phone: string }
+  sponsorshipType: SponsorshipType
+  category?: SponsorshipCategory
+  numberOfPersons?: number
+  amount: number
+}
+
+// POST /sponsorships → returns the created sponsorship (id used as the payment resourceId)
+export async function createSponsorship(payload: CreateSponsorshipPayload): Promise<SponsorshipData> {
+  const data = await request<{ success: boolean; data: { sponsorship?: SponsorshipData } | SponsorshipData }>(
+    '/sponsorships',
+    { method: 'POST', body: JSON.stringify(payload) }
+  )
+  const inner = (data as { data?: unknown }).data ?? data
+  const raw = ((inner as { sponsorship?: SponsorshipData }).sponsorship ?? inner) as Record<string, unknown>
+  return normalizeId(raw) as unknown as SponsorshipData
 }
 
 // GET /orders/lookup/:orderNumber

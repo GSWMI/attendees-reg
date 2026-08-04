@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, ChevronDown, ChevronUp, Minus, Plus, Users, Hash } from 'lucide-react'
+import { MapPin, ChevronDown, ChevronUp, Minus, Plus, Users, Hash, ArrowLeft } from 'lucide-react'
 import { getEventBySlug } from '../services/api'
 import type { AccommodationData, TransportData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
@@ -193,6 +193,11 @@ export default function EventPage() {
       <AnnouncementBanner />
 
       <main className="flex-1 max-w-[1000px] mx-auto w-full px-4 py-8">
+
+        <button onClick={() => navigate(`/events/s/${slug}`)}
+          className="flex items-center gap-2 text-[14px] text-gray-700 hover:text-gray-900 transition-colors mb-6">
+          <ArrowLeft size={18} /> Back
+        </button>
 
         {/* Event hero card */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-8">
