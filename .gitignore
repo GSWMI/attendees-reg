@@ -16,6 +16,13 @@ dist-ssr
 .env.*.local
 .env.production
 
+# Local API docs (Postman) — keep out of the repo
+*.postman_collection.json
+*.postman_environment.json
+postman/
+API_DOCS.*
+api-docs.*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,14 +1,19 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { RegistrationProvider } from './hooks/useRegistration.tsx'
 import HomePage from './pages/HomePage.tsx'
+import ChoicePage from './pages/ChoicePage'
 import EventPage from './pages/EventPage'
 import RegisterPage from './pages/RegisterPage'
+import ReviewPage from './pages/ReviewPage'
+import SponsorPage from './pages/SponsorPage'
+import SponsorReviewPage from './pages/SponsorReviewPage'
 import {
   PleaseWaitPage,
   PaymentFailedPage,
   PaymentVerifyPage,
   PaymentCallbackPage,
   SuccessPage,
+  SponsorSuccessPage,
 } from './pages/StatusPages'
 import { useNavigate } from 'react-router-dom'
 
@@ -39,11 +44,22 @@ export default function App() {
           {/* Home — upcoming events list */}
           <Route path="/" element={<HomePage />} />
 
-          {/* Event landing page */}
-          <Route path="/events/s/:slug" element={<EventPage />} />
+          {/* Event landing — choose how to register */}
+          <Route path="/events/s/:slug" element={<ChoicePage />} />
+
+          {/* Ticket selection (myself / someone else) */}
+          <Route path="/events/s/:slug/tickets" element={<EventPage />} />
 
           {/* Registration + checkout */}
           <Route path="/events/s/:slug/register" element={<RegisterPage />} />
+
+          {/* Review before payment */}
+          <Route path="/events/s/:slug/review" element={<ReviewPage />} />
+
+          {/* Sponsorship */}
+          <Route path="/events/s/:slug/sponsor" element={<SponsorPage />} />
+          <Route path="/events/s/:slug/sponsor/review" element={<SponsorReviewPage />} />
+          <Route path="/events/s/:slug/sponsor/success" element={<SponsorSuccessPage />} />
 
           {/* Payment states */}
           <Route path="/events/s/:slug/please-wait" element={<PleaseWaitPage />} />

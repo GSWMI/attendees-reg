@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, ChevronDown, ChevronUp, Minus, Plus, Users, Hash } from 'lucide-react'
+import { MapPin, ChevronDown, ChevronUp, Minus, Plus, Users, Hash, ArrowLeft } from 'lucide-react'
 import { getEventBySlug } from '../services/api'
 import type { AccommodationData, TransportData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
@@ -96,6 +96,18 @@ export default function EventPage() {
     load()
   }, [slug])
 
+  // If the user arrives with selections already in context (e.g. they came
+  // back from the review screen to edit), reveal the matching sections so
+  // their existing choices are visible rather than hidden behind a collapsed,
+  // unchecked panel.
+  useEffect(() => {
+    const hasMealSel = Object.values(quantities).some((slots) =>
+      Object.values(slots).some((v) => (v as { quantity: number }).quantity > 0))
+    if (hasMealSel) { setMealChecked(true); setMealOpen(true) }
+    if (selectedAccommodationId) { setAccChecked(true); setAccOpen(true) }
+    if (selectedTransportId) { setTransportChecked(true); setTransportOpen(true) }
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f5f3]">
@@ -181,6 +193,11 @@ export default function EventPage() {
       <AnnouncementBanner />
 
       <main className="flex-1 max-w-[1000px] mx-auto w-full px-4 py-8">
+
+        <button onClick={() => navigate(`/events/s/${slug}`)}
+          className="flex items-center gap-2 text-[14px] text-gray-700 hover:text-gray-900 transition-colors mb-6">
+          <ArrowLeft size={18} /> Back
+        </button>
 
         {/* Event hero card */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-8">
