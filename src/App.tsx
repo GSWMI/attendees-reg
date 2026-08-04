@@ -3,6 +3,7 @@ import { RegistrationProvider } from './hooks/useRegistration.tsx'
 import HomePage from './pages/HomePage.tsx'
 import EventPage from './pages/EventPage'
 import RegisterPage from './pages/RegisterPage'
+import ReviewPage from './pages/ReviewPage'
 import {
   PleaseWaitPage,
   PaymentFailedPage,
@@ -44,6 +45,9 @@ export default function App() {
 
           {/* Registration + checkout */}
           <Route path="/events/s/:slug/register" element={<RegisterPage />} />
+
+          {/* Review before payment */}
+          <Route path="/events/s/:slug/review" element={<ReviewPage />} />
 
           {/* Payment states */}
           <Route path="/events/s/:slug/please-wait" element={<PleaseWaitPage />} />

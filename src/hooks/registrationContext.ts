@@ -1,4 +1,4 @@
-import { createContext } from 'react'
+import { createContext, type Dispatch, type SetStateAction } from 'react'
 import type { EventData, MealSelection, OrderData } from '../services/api'
 
 export interface QuantityMap {
@@ -8,6 +8,28 @@ export interface QuantityMap {
       quantity: number
     }
   }
+}
+
+// Attendee + next-of-kin details. Lives in context (not local page state) so it
+// survives navigation between the details form and the review screen.
+export interface GuestForm {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  whatsappNumber: string
+  gender: 'male' | 'female' | ''
+  nokFullName: string
+  nokEmail: string
+  nokPhone: string
+  nokWhatsappNumber: string
+}
+
+export const emptyGuestForm: GuestForm = {
+  firstName: '', lastName: '', email: '',
+  phone: '', whatsappNumber: '',
+  gender: '',
+  nokFullName: '', nokEmail: '', nokPhone: '', nokWhatsappNumber: '',
 }
 
 export interface RegistrationContextValue {
@@ -22,6 +44,13 @@ export interface RegistrationContextValue {
   setSelectedAccommodationId: (id: string) => void
   selectedTransportId: string
   setSelectedTransportId: (id: string) => void
+  // Attendee details — persisted across the details/review steps
+  guest: GuestForm
+  setGuest: Dispatch<SetStateAction<GuestForm>>
+  customAnswers: Record<string, string>
+  setCustomAnswers: Dispatch<SetStateAction<Record<string, string>>>
+  consent: boolean
+  setConsent: Dispatch<SetStateAction<boolean>>
   order: OrderData | null
   setOrder: (o: OrderData) => void
   clearOrder: () => void

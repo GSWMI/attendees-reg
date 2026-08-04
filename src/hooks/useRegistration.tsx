@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { EventData, MealSelection, OrderData } from '../services/api'
-import { RegistrationContext } from './registrationContext'
-import type { QuantityMap } from './registrationContext'
+import { RegistrationContext, emptyGuestForm } from './registrationContext'
+import type { QuantityMap, GuestForm } from './registrationContext'
 
 // ── Provider ────────────────────────────────────────────────────────────────
 
@@ -10,6 +10,9 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [quantities, setQuantities] = useState<QuantityMap>({})
   const [selectedAccommodationId, setSelectedAccommodationId] = useState('')
   const [selectedTransportId, setSelectedTransportId] = useState('')
+  const [guest, setGuest] = useState<GuestForm>(emptyGuestForm)
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
+  const [consent, setConsent] = useState(false)
   const [order, setOrder] = useState<OrderData | null>(null)
 
   const setQty = (day: number, slot: string, optionIndex: number, delta: number) => {
@@ -72,6 +75,9 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
       grandTotal, mealSelections,
       selectedAccommodationId, setSelectedAccommodationId,
       selectedTransportId, setSelectedTransportId,
+      guest, setGuest,
+      customAnswers, setCustomAnswers,
+      consent, setConsent,
       order, setOrder, clearOrder,
     }}>
       {children}

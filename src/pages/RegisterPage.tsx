@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Mail, Phone, ChevronDown, ChevronUp } from 'lucide-react'
-import { createOrder } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
-
-type Gateway = 'paystack'
 
 // Strip HTML entities from backend-generated strings
 function sanitizeHtml(raw: string): string {
@@ -37,50 +34,42 @@ function isValidPhone(raw: string): boolean {
 export default function RegisterPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const { event, mealSelections, grandTotal, selectedAccommodationId, selectedTransportId, setOrder } = useRegistration()
+  const {
+    event, mealSelections, grandTotal, selectedAccommodationId, selectedTransportId,
+    guest, setGuest, customAnswers, setCustomAnswers, consent, setConsent,
+  } = useRegistration()
 
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '',
-    phone: '', whatsappNumber: '',
-    gender: '' as 'male' | 'female' | '',
-    nokFullName: '', nokEmail: '', nokPhone: '', nokWhatsappNumber: '',
-  })
-  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
-  const [consent, setConsent] = useState(false)
-  const [gateway, setGateway] = useState<Gateway | null>(null)
   const [showDetails, setShowDetails] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!event) navigate(`/events/s/${slug}`)
   }, [event])
 
-  const update = (field: string, value: string) => {
-    setForm((p) => ({ ...p, [field]: value }))
+  const update = (field: keyof typeof guest, value: string) => {
+    setGuest((p) => ({ ...p, [field]: value }))
     setErrors((p) => ({ ...p, [field]: '' }))
   }
 
   const validate = () => {
     const errs: Record<string, string> = {}
-    if (!form.firstName.trim()) errs.firstName = 'Required'
-    if (!form.lastName.trim()) errs.lastName = 'Required'
-    if (!form.email.trim()) errs.email = 'Required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Invalid email'
-    if (!form.phone.trim()) errs.phone = 'Required'
-    else if (!isValidPhone(form.phone)) errs.phone = 'Invalid phone number'
-    if (!form.whatsappNumber.trim()) errs.whatsappNumber = 'Required'
-    else if (!isValidPhone(form.whatsappNumber)) errs.whatsappNumber = 'Invalid phone number'
-    if (!form.gender) errs.gender = 'Required'
-    if (!form.nokFullName.trim()) errs.nokFullName = 'Required'
-    if (!form.nokEmail.trim()) errs.nokEmail = 'Required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.nokEmail)) errs.nokEmail = 'Invalid email'
-    if (!form.nokPhone.trim()) errs.nokPhone = 'Required'
-    else if (!isValidPhone(form.nokPhone)) errs.nokPhone = 'Invalid phone number'
-    if (!form.nokWhatsappNumber.trim()) errs.nokWhatsappNumber = 'Required'
-    else if (!isValidPhone(form.nokWhatsappNumber)) errs.nokWhatsappNumber = 'Invalid phone number'
+    if (!guest.firstName.trim()) errs.firstName = 'Required'
+    if (!guest.lastName.trim()) errs.lastName = 'Required'
+    if (!guest.email.trim()) errs.email = 'Required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email)) errs.email = 'Invalid email'
+    if (!guest.phone.trim()) errs.phone = 'Required'
+    else if (!isValidPhone(guest.phone)) errs.phone = 'Invalid phone number'
+    if (!guest.whatsappNumber.trim()) errs.whatsappNumber = 'Required'
+    else if (!isValidPhone(guest.whatsappNumber)) errs.whatsappNumber = 'Invalid phone number'
+    if (!guest.gender) errs.gender = 'Required'
+    if (!guest.nokFullName.trim()) errs.nokFullName = 'Required'
+    if (!guest.nokEmail.trim()) errs.nokEmail = 'Required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.nokEmail)) errs.nokEmail = 'Invalid email'
+    if (!guest.nokPhone.trim()) errs.nokPhone = 'Required'
+    else if (!isValidPhone(guest.nokPhone)) errs.nokPhone = 'Invalid phone number'
+    if (!guest.nokWhatsappNumber.trim()) errs.nokWhatsappNumber = 'Required'
+    else if (!isValidPhone(guest.nokWhatsappNumber)) errs.nokWhatsappNumber = 'Invalid phone number'
     if (!consent) errs.consent = 'You must agree to the terms'
-    if (!gateway) errs.gateway = 'Please choose a payment gateway'
     event?.customQuestions?.forEach((q) => {
       if (q.required && !customAnswers[q.question]?.trim()) {
         errs[q.question] = 'Required'
@@ -90,44 +79,14 @@ export default function RegisterPage() {
     return Object.keys(errs).length === 0
   }
 
-  const handleCheckout = async () => {
+  const handleReview = () => {
     if (!validate() || !event) return
-    setLoading(true)
-    try {
-      const order = await createOrder({
-        eventId: event._id ?? event.id ?? '',
-        guest: {
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email: form.email,
-          phone: form.phone.trim(),
-          whatsappNumber: form.whatsappNumber.trim(),
-          gender: form.gender,
-          nextOfKin: {
-            fullName: form.nokFullName.trim(),
-            email: form.nokEmail.trim(),
-            phone: form.nokPhone.trim(),
-            whatsappNumber: form.nokWhatsappNumber.trim(),
-          },
-        },
-        mealSelections,
-        customAnswers: Object.entries(customAnswers).map(([question, answer]) => ({ question, answer })),
-        ...(selectedAccommodationId ? { accommodationId: selectedAccommodationId } : {}),
-        ...(selectedTransportId ? { transportId: selectedTransportId } : {}),
-      })
-      setOrder(order)
-      const orderId = order._id ?? (order as { id?: string }).id
-      navigate(`/events/s/${slug}/please-wait`, { state: { orderId } })
-    } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message ?? 'Failed to process. Please try again.'
-      setErrors({ submit: msg })
-      setLoading(false)
-    }
+    navigate(`/events/s/${slug}/review`)
   }
 
   if (!event) return null
 
-  const canCheckout = form.firstName && form.lastName && form.email && form.phone && form.whatsappNumber && form.gender && form.nokFullName && form.nokEmail && form.nokPhone && form.nokWhatsappNumber && consent && gateway
+  const canReview = guest.firstName && guest.lastName && guest.email && guest.phone && guest.whatsappNumber && guest.gender && guest.nokFullName && guest.nokEmail && guest.nokPhone && guest.nokWhatsappNumber && consent
 
   // Sanitize consent text to remove &nbsp; and other HTML entities
   const cleanConsentText = sanitizeHtml(
@@ -152,27 +111,27 @@ export default function RegisterPage() {
           {/* Left: Form */}
           <div className="flex flex-col gap-5">
             <FormField label="First name" required error={errors.firstName} icon={<User size={15} className="text-gray-400" />}>
-              <input value={form.firstName} onChange={(e) => update('firstName', e.target.value)}
+              <input value={guest.firstName} onChange={(e) => update('firstName', e.target.value)}
                 placeholder="First name" className={inputClass(!!errors.firstName)} />
             </FormField>
 
             <FormField label="Last name" required error={errors.lastName} icon={<User size={15} className="text-gray-400" />}>
-              <input value={form.lastName} onChange={(e) => update('lastName', e.target.value)}
+              <input value={guest.lastName} onChange={(e) => update('lastName', e.target.value)}
                 placeholder="Last name" className={inputClass(!!errors.lastName)} />
             </FormField>
 
             <FormField label="Email address" required error={errors.email} icon={<Mail size={15} className="text-gray-400" />}>
-              <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)}
+              <input type="email" value={guest.email} onChange={(e) => update('email', e.target.value)}
                 placeholder="Email address" className={inputClass(!!errors.email)} />
             </FormField>
 
             <FormField label="Phone number" required error={errors.phone} icon={<Phone size={15} className="text-gray-400" />}>
-              <input type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)}
+              <input type="tel" value={guest.phone} onChange={(e) => update('phone', e.target.value)}
                 placeholder="Phone number" className={inputClass(!!errors.phone)} />
             </FormField>
 
             <FormField label="WhatsApp number" required error={errors.whatsappNumber} icon={<Phone size={15} className="text-gray-400" />}>
-              <input type="tel" value={form.whatsappNumber} onChange={(e) => update('whatsappNumber', e.target.value)}
+              <input type="tel" value={guest.whatsappNumber} onChange={(e) => update('whatsappNumber', e.target.value)}
                 placeholder="WhatsApp number" className={inputClass(!!errors.whatsappNumber)} />
             </FormField>
 
@@ -183,7 +142,7 @@ export default function RegisterPage() {
                   <button key={g} type="button"
                     onClick={() => { update('gender', g); setErrors((p) => ({ ...p, gender: '' })) }}
                     className={`flex-1 py-3 rounded-lg border text-[14px] font-medium capitalize transition-all ${
-                      form.gender === g
+                      guest.gender === g
                         ? 'border-[#3b5bdb] bg-blue-50/60 text-[#3b5bdb]'
                         : 'border-gray-300 text-gray-600 hover:border-gray-400'
                     }`}>
@@ -197,19 +156,19 @@ export default function RegisterPage() {
             <div className="rounded-xl border border-gray-200 p-4 flex flex-col gap-4">
               <p className="text-[14px] font-semibold text-gray-800">Next of kin <span className="text-[#3b5bdb] ml-1">*</span></p>
               <FormField label="Full name" required error={errors.nokFullName} icon={<User size={15} className="text-gray-400" />}>
-                <input value={form.nokFullName} onChange={(e) => update('nokFullName', e.target.value)}
+                <input value={guest.nokFullName} onChange={(e) => update('nokFullName', e.target.value)}
                   placeholder="Full name" className={inputClass(!!errors.nokFullName)} />
               </FormField>
               <FormField label="Email address" required error={errors.nokEmail} icon={<Mail size={15} className="text-gray-400" />}>
-                <input type="email" value={form.nokEmail} onChange={(e) => update('nokEmail', e.target.value)}
+                <input type="email" value={guest.nokEmail} onChange={(e) => update('nokEmail', e.target.value)}
                   placeholder="Email address" className={inputClass(!!errors.nokEmail)} />
               </FormField>
               <FormField label="Phone number" required error={errors.nokPhone} icon={<Phone size={15} className="text-gray-400" />}>
-                <input type="tel" value={form.nokPhone} onChange={(e) => update('nokPhone', e.target.value)}
+                <input type="tel" value={guest.nokPhone} onChange={(e) => update('nokPhone', e.target.value)}
                   placeholder="Phone number" className={inputClass(!!errors.nokPhone)} />
               </FormField>
               <FormField label="WhatsApp number" required error={errors.nokWhatsappNumber} icon={<Phone size={15} className="text-gray-400" />}>
-                <input type="tel" value={form.nokWhatsappNumber} onChange={(e) => update('nokWhatsappNumber', e.target.value)}
+                <input type="tel" value={guest.nokWhatsappNumber} onChange={(e) => update('nokWhatsappNumber', e.target.value)}
                   placeholder="WhatsApp number" className={inputClass(!!errors.nokWhatsappNumber)} />
               </FormField>
             </div>
@@ -324,25 +283,19 @@ export default function RegisterPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-[13px] text-gray-600 mb-3">Payment Gateway</p>
-              <div className="flex items-center gap-4 mb-4">
-                <GatewayOption
-                  selected={gateway === 'paystack'}
-                  onSelect={() => { setGateway('paystack'); setErrors((p) => ({ ...p, gateway: '' })) }}
-                  logo={<PaystackLogo />}
-                />
-              </div>
-              {errors.gateway && <p className="text-[12px] text-red-500 mb-3">{errors.gateway}</p>}
               <button
-                onClick={handleCheckout}
-                disabled={!canCheckout || loading}
+                onClick={handleReview}
+                disabled={!canReview}
                 className={`w-full py-3.5 rounded-lg text-[15px] font-semibold transition-all ${
-                  canCheckout && !loading
+                  canReview
                     ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}>
-                {loading ? 'Processing...' : 'Checkout'}
+                Review order
               </button>
+              <p className="text-[12px] text-gray-400 text-center mt-2">
+                You'll confirm your details and pay on the next step.
+              </p>
             </div>
           </div>
         </div>
@@ -376,35 +329,4 @@ function inputClass(hasError: boolean) {
       ? 'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100'
       : 'border-gray-300 focus:border-[#3b5bdb] focus:ring-1 focus:ring-[#3b5bdb]/20'
   }`
-}
-
-function GatewayOption({ selected, onSelect, logo }: {
-  selected: boolean; onSelect: () => void; logo: React.ReactNode
-}) {
-  return (
-    <button onClick={onSelect}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
-        selected ? 'border-[#3b5bdb] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-      }`}>
-      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-        selected ? 'border-[#3b5bdb]' : 'border-gray-300'
-      }`}>
-        {selected && <div className="w-2.5 h-2.5 rounded-full bg-[#3b5bdb]" />}
-      </div>
-      {logo}
-    </button>
-  )
-}
-
-function PaystackLogo() {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex flex-col gap-0.5">
-        {['bg-[#00c2b2]', 'bg-[#011b33]', 'bg-[#00c2b2]'].map((c, i) => (
-          <div key={i} className={`h-1 w-4 rounded-sm ${c}`} />
-        ))}
-      </div>
-      <span className="text-[14px] font-bold text-[#011b33]">paystack</span>
-    </div>
-  )
 }

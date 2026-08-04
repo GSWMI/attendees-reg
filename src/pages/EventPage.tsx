@@ -96,6 +96,18 @@ export default function EventPage() {
     load()
   }, [slug])
 
+  // If the user arrives with selections already in context (e.g. they came
+  // back from the review screen to edit), reveal the matching sections so
+  // their existing choices are visible rather than hidden behind a collapsed,
+  // unchecked panel.
+  useEffect(() => {
+    const hasMealSel = Object.values(quantities).some((slots) =>
+      Object.values(slots).some((v) => (v as { quantity: number }).quantity > 0))
+    if (hasMealSel) { setMealChecked(true); setMealOpen(true) }
+    if (selectedAccommodationId) { setAccChecked(true); setAccOpen(true) }
+    if (selectedTransportId) { setTransportChecked(true); setTransportOpen(true) }
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f5f3]">
