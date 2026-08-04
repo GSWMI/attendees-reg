@@ -74,6 +74,7 @@ export interface EventData {
   location?: string
   bannerUrl?: string
   slug?: string
+  whatsappLink?: string
   mealOptions?: MealOptionGroup[]
   customQuestions?: CustomQuestion[]
   consentText?: string
