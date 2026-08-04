@@ -24,15 +24,26 @@ function sanitizeHtml(raw: string): string {
     .trim()
 }
 
+// Validate a phone number. Accepts Nigerian local format (e.g. 08012345678)
+// or international format (e.g. +2348012345678); allows spaces, dashes and
+// parentheses as separators. Requires 10–15 digits.
+function isValidPhone(raw: string): boolean {
+  const value = raw.trim()
+  if (!/^\+?[\d\s()-]+$/.test(value)) return false
+  const digits = value.replace(/\D/g, '')
+  return digits.length >= 10 && digits.length <= 15
+}
+
 export default function RegisterPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const { event, mealSelections, grandTotal, selectedAccommodationId, selectedTransportId, setOrder } = useRegistration()
 
   const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', phone: '',
+    firstName: '', lastName: '', email: '',
+    phone: '', whatsappNumber: '',
     gender: '' as 'male' | 'female' | '',
-    nokFullName: '', nokEmail: '',
+    nokFullName: '', nokEmail: '', nokPhone: '', nokWhatsappNumber: '',
   })
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
   const [consent, setConsent] = useState(false)
@@ -57,10 +68,17 @@ export default function RegisterPage() {
     if (!form.email.trim()) errs.email = 'Required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Invalid email'
     if (!form.phone.trim()) errs.phone = 'Required'
+    else if (!isValidPhone(form.phone)) errs.phone = 'Invalid phone number'
+    if (!form.whatsappNumber.trim()) errs.whatsappNumber = 'Required'
+    else if (!isValidPhone(form.whatsappNumber)) errs.whatsappNumber = 'Invalid phone number'
     if (!form.gender) errs.gender = 'Required'
     if (!form.nokFullName.trim()) errs.nokFullName = 'Required'
     if (!form.nokEmail.trim()) errs.nokEmail = 'Required'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.nokEmail)) errs.nokEmail = 'Invalid email'
+    if (!form.nokPhone.trim()) errs.nokPhone = 'Required'
+    else if (!isValidPhone(form.nokPhone)) errs.nokPhone = 'Invalid phone number'
+    if (!form.nokWhatsappNumber.trim()) errs.nokWhatsappNumber = 'Required'
+    else if (!isValidPhone(form.nokWhatsappNumber)) errs.nokWhatsappNumber = 'Invalid phone number'
     if (!consent) errs.consent = 'You must agree to the terms'
     if (!gateway) errs.gateway = 'Please choose a payment gateway'
     event?.customQuestions?.forEach((q) => {
@@ -82,11 +100,14 @@ export default function RegisterPage() {
           firstName: form.firstName,
           lastName: form.lastName,
           email: form.email,
-          phone: form.phone,
+          phone: form.phone.trim(),
+          whatsappNumber: form.whatsappNumber.trim(),
           gender: form.gender,
           nextOfKin: {
             fullName: form.nokFullName.trim(),
             email: form.nokEmail.trim(),
+            phone: form.nokPhone.trim(),
+            whatsappNumber: form.nokWhatsappNumber.trim(),
           },
         },
         mealSelections,
@@ -106,7 +127,7 @@ export default function RegisterPage() {
 
   if (!event) return null
 
-  const canCheckout = form.firstName && form.lastName && form.email && form.phone && form.gender && form.nokFullName && form.nokEmail && consent && gateway
+  const canCheckout = form.firstName && form.lastName && form.email && form.phone && form.whatsappNumber && form.gender && form.nokFullName && form.nokEmail && form.nokPhone && form.nokWhatsappNumber && consent && gateway
 
   // Sanitize consent text to remove &nbsp; and other HTML entities
   const cleanConsentText = sanitizeHtml(
@@ -145,9 +166,14 @@ export default function RegisterPage() {
                 placeholder="Email address" className={inputClass(!!errors.email)} />
             </FormField>
 
-            <FormField label="WhatsApp phone number" required error={errors.phone} icon={<Phone size={15} className="text-gray-400" />}>
+            <FormField label="Phone number" required error={errors.phone} icon={<Phone size={15} className="text-gray-400" />}>
               <input type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)}
                 placeholder="Phone number" className={inputClass(!!errors.phone)} />
+            </FormField>
+
+            <FormField label="WhatsApp number" required error={errors.whatsappNumber} icon={<Phone size={15} className="text-gray-400" />}>
+              <input type="tel" value={form.whatsappNumber} onChange={(e) => update('whatsappNumber', e.target.value)}
+                placeholder="WhatsApp number" className={inputClass(!!errors.whatsappNumber)} />
             </FormField>
 
             {/* Gender */}
@@ -177,6 +203,14 @@ export default function RegisterPage() {
               <FormField label="Email address" required error={errors.nokEmail} icon={<Mail size={15} className="text-gray-400" />}>
                 <input type="email" value={form.nokEmail} onChange={(e) => update('nokEmail', e.target.value)}
                   placeholder="Email address" className={inputClass(!!errors.nokEmail)} />
+              </FormField>
+              <FormField label="Phone number" required error={errors.nokPhone} icon={<Phone size={15} className="text-gray-400" />}>
+                <input type="tel" value={form.nokPhone} onChange={(e) => update('nokPhone', e.target.value)}
+                  placeholder="Phone number" className={inputClass(!!errors.nokPhone)} />
+              </FormField>
+              <FormField label="WhatsApp number" required error={errors.nokWhatsappNumber} icon={<Phone size={15} className="text-gray-400" />}>
+                <input type="tel" value={form.nokWhatsappNumber} onChange={(e) => update('nokWhatsappNumber', e.target.value)}
+                  placeholder="WhatsApp number" className={inputClass(!!errors.nokWhatsappNumber)} />
               </FormField>
             </div>
 

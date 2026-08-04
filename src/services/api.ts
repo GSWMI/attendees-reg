@@ -139,8 +139,9 @@ export interface CreateOrderPayload {
     lastName: string
     email: string
     phone: string
+    whatsappNumber: string
     gender: string
-    nextOfKin: { fullName: string; email: string }
+    nextOfKin: { fullName: string; email: string; phone: string; whatsappNumber: string }
   }
   mealSelections: MealSelection[]
   customAnswers: { question: string; answer: string }[]
@@ -159,8 +160,9 @@ export interface OrderData {
     lastName: string
     email: string
     phone: string
+    whatsappNumber: string
     gender: string
-    nextOfKin: { fullName: string; email: string }
+    nextOfKin: { fullName: string; email: string; phone: string; whatsappNumber: string }
   }
   mealSelections: MealSelection[]
   qrCodes?: {
