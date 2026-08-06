@@ -95,6 +95,10 @@ export interface RegistrationContextValue {
   clearOrder: () => void
   sponsorship: SponsorshipData | null
   setSponsorship: (s: SponsorshipData | null) => void
+  // WhatsApp group link — only returned by the payment verify endpoint, so it's
+  // captured there and read on the success page.
+  whatsappLink: string | null
+  setWhatsappLink: (v: string | null) => void
   // Clears mode + all draft form state (called after a completed payment).
   resetRegistration: () => void
 }

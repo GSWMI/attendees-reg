@@ -1,5 +1,4 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://gwmi-backend-staging.onrender.com/api'
-const SITE_URL = 'https://events.gswmi.com/'
 
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -74,7 +73,6 @@ export interface EventData {
   location?: string
   bannerUrl?: string
   slug?: string
-  whatsappLink?: string
   mealOptions?: MealOptionGroup[]
   customQuestions?: CustomQuestion[]
   consentText?: string
@@ -226,23 +224,25 @@ export async function calculateOrder(
 // sponsorships (replaces the old /orders/:id/pay path).
 export type PaymentContext = 'order' | 'sponsorship'
 
-// POST /payments/:context/:resourceId/pay
+// The payment context is encoded in the reference prefix by the backend.
+export function contextFromReference(reference: string): PaymentContext {
+  return /^PAY[_-]?SPN/i.test(reference) ? 'sponsorship' : 'order'
+}
+
+// POST /payments/:context/:resourceId/initiate
 // Response: { success, data: { authorizationUrl, accessCode, reference } }
+// (Postman documents this as /pay, but the deployed route is /initiate.)
+// We send an origin-based callbackUrl so each environment (localhost / prod)
+// gets the right return URL. NOTE: the backend must forward this to Paystack's
+// `callback_url`; until it does, Paystack falls back to the fixed dashboard URL.
 export async function initiatePayment(
   context: PaymentContext,
-  resourceId: string,
-  slug?: string
+  resourceId: string
 ): Promise<{ paymentUrl: string; reference: string }> {
-  // Slug-based verify page for the event flow; slug-less callback otherwise.
-  const callbackUrl = slug
-    ? `${SITE_URL}/events/s/${slug}/verify`
-    : `${SITE_URL}/payment/callback`
+  const callbackUrl = `${window.location.origin}/payment/callback`
   const raw = await request<{ success: boolean; data: Record<string, unknown> }>(
-    `/payments/${context}/${resourceId}/pay`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ callbackUrl }),
-    }
+    `/payments/${context}/${resourceId}/initiate`,
+    { method: 'POST', body: JSON.stringify({ callbackUrl }) }
   )
   const inner = raw.data ?? (raw as unknown as Record<string, unknown>)
   const paymentUrl = String(inner.authorizationUrl ?? inner.paymentUrl ?? inner.authorization_url ?? '')
@@ -251,29 +251,32 @@ export async function initiatePayment(
 }
 
 // GET /payments/verify/:reference
-// The reference already carries its context, so we don't pass it again.
-// For an order context, data holds the order; for sponsorship, the sponsorship.
+// Context is derived from the reference prefix (PAY_ORD_… / PAY_SPN_…).
+// Order verify returns the order plus a whatsappLink (only exposed here, never
+// on the public event read). Sponsorship verify returns the sponsorship object.
 export async function verifyPayment(
   reference: string
-): Promise<{ status: string; order?: OrderData; sponsorship?: SponsorshipData }> {
+): Promise<{ status: string; order?: OrderData; sponsorship?: SponsorshipData; whatsappLink?: string }> {
   const data = await request<{ success: boolean; data: Record<string, unknown> }>(
     `/payments/verify/${reference}`
   )
   const inner = (data.data ?? (data as unknown as Record<string, unknown>)) as Record<string, unknown>
+  const isSponsorship = contextFromReference(reference) === 'sponsorship'
+    || !!inner.sponsorship || !!inner.sponsorshipType
 
-  // Sponsorship result
-  if (inner.sponsorship || inner.sponsorshipType) {
+  if (isSponsorship) {
     const rawSp = (inner.sponsorship ?? inner) as Record<string, unknown>
     const sponsorship = normalizeId(rawSp) as unknown as SponsorshipData
-    const status = String(rawSp.status ?? rawSp.paymentStatus ?? 'unknown')
+    const status = String(rawSp.paymentStatus ?? rawSp.status ?? 'unknown')
     return { status, sponsorship }
   }
 
-  // Order result (default)
   const rawOrder = (inner.order ?? inner) as Record<string, unknown>
   const order = normalizeId(rawOrder) as unknown as OrderData
   const status = String(rawOrder.status ?? rawOrder.paymentStatus ?? 'unknown')
-  return { status, order }
+  // whatsappLink may sit alongside the order or on it
+  const whatsappLink = (inner.whatsappLink ?? rawOrder.whatsappLink) as string | undefined
+  return { status, order, whatsappLink }
 }
 
 // ── Sponsorship ─────────────────────────────────────────────────────────────
