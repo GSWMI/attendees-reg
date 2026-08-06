@@ -34,6 +34,7 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [sponsor, setSponsor] = useState<SponsorForm>(emptySponsorForm)
   const [order, setOrder] = useState<OrderData | null>(null)
   const [sponsorship, setSponsorship] = useState<SponsorshipData | null>(null)
+  const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
 
   const setQty = (day: number, slot: string, optionIndex: number, delta: number) => {
     setQuantities((prev) => {
@@ -101,6 +102,7 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
     setQuantities({})
     setSelectedAccommodationId('')
     setSelectedTransportId('')
+    setWhatsappLink(null)
   }
 
   return (
@@ -118,6 +120,7 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
       sponsor, setSponsor,
       order, setOrder, clearOrder,
       sponsorship, setSponsorship,
+      whatsappLink, setWhatsappLink,
       resetRegistration,
     }}>
       {children}

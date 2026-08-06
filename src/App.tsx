@@ -70,6 +70,7 @@ export default function App() {
           {/* Paystack dashboard callback (slug-less) */}
           <Route path="/payment/callback" element={<PaymentCallbackPage />} />
           <Route path="/payment/success" element={<SuccessPage />} />
+          <Route path="/payment/sponsor-success" element={<SponsorSuccessPage />} />
           <Route path="/payment/failed" element={<PaymentFailedPage />} />
 
           {/* Fallback */}

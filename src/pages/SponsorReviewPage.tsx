@@ -31,7 +31,13 @@ export default function SponsorReviewPage() {
     ? (unit ? unit.price * persons : 0)
     : Number(sponsor.amount) || 0
 
+  // Block specific-sponsorship checkout while the per-person price is a
+  // placeholder — otherwise we'd charge a fabricated amount. General
+  // sponsorship (sponsor types their own amount) is never gated.
+  const priceUnavailable = isSpecific && !!unit?.isPlaceholder
+
   const handleCheckout = async () => {
+    if (priceUnavailable) return
     setLoading(true)
     setError('')
     try {
@@ -51,7 +57,7 @@ export default function SponsorReviewPage() {
       })
       setSponsorship(sp)
       const id = sp._id ?? sp.id ?? ''
-      const payment = await initiatePayment('sponsorship', id, slug)
+      const payment = await initiatePayment('sponsorship', id)
       if (payment.paymentUrl) {
         window.location.href = payment.paymentUrl
       } else {
@@ -104,9 +110,13 @@ export default function SponsorReviewPage() {
                 <span className="text-[15px] font-bold text-gray-900">₦{amount.toLocaleString()}</span>
               </div>
               {unit?.isPlaceholder && (
-                <p className="text-[12px] text-amber-600">
-                  Per-person price is a placeholder until admin pricing is set on the event.
-                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                  <p className="text-[12px] text-amber-700">
+                    Pricing for this category isn't available yet, so checkout is temporarily
+                    disabled. Please check back once event pricing is set, or use General
+                    sponsorship to sponsor an open amount.
+                  </p>
+                </div>
               )}
             </div>
           ) : (
@@ -118,11 +128,11 @@ export default function SponsorReviewPage() {
 
           {error && <p className="text-[13px] text-red-500 mb-3">{error}</p>}
 
-          <button onClick={handleCheckout} disabled={loading}
+          <button onClick={handleCheckout} disabled={loading || priceUnavailable}
             className={`w-full py-3.5 rounded-lg text-[15px] font-semibold transition-all ${
-              loading ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]'
+              loading || priceUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]'
             }`}>
-            {loading ? 'Processing...' : 'Checkout'}
+            {loading ? 'Processing...' : priceUnavailable ? 'Pricing unavailable' : 'Checkout'}
           </button>
         </div>
       </main>

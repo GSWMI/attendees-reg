@@ -26,7 +26,7 @@ export function PleaseWaitPage() {
       return
     }
 
-    initiatePayment('order', orderId, slug)
+    initiatePayment('order', orderId)
       .then((payment) => {
         if (payment.paymentUrl) {
           window.location.href = payment.paymentUrl
@@ -76,7 +76,7 @@ export function PaymentVerifyPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { slug } = useParams<{ slug: string }>()
-  const { setOrder } = useRegistration()
+  const { setOrder, setWhatsappLink } = useRegistration()
 
   useEffect(() => {
     const reference = searchParams.get('reference') ?? searchParams.get('trxref')
@@ -91,6 +91,7 @@ export function PaymentVerifyPage() {
           navigate(`/events/s/${slug}/sponsor/success`)
         } else if (ok && result.order) {
           setOrder(result.order)
+          setWhatsappLink(result.whatsappLink ?? null)
           const orderNum = result.order.orderNumber ?? result.order._id ?? ''
           navigate(`/events/s/${slug}/success?order=${encodeURIComponent(orderNum)}`)
         } else {
@@ -119,12 +120,15 @@ export function PaymentVerifyPage() {
 export function SuccessPage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
-  const { event: ctxEvent, order: ctxOrder, setOrder, setEvent, resetRegistration } = useRegistration()
+  const { event: ctxEvent, order: ctxOrder, setOrder, setEvent, whatsappLink: ctxWhatsappLink, resetRegistration } = useRegistration()
   const navigate = useNavigate()
   const ticketRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
   const [order, setLocalOrder] = useState<OrderData | null>(ctxOrder)
   const [event, setLocalEvent] = useState<EventData | null>(ctxEvent)
+  // Captured at first render (before resetRegistration runs) — the link comes
+  // from the payment verify step and lives only in context.
+  const [whatsappLink] = useState<string | null>(ctxWhatsappLink)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -269,11 +273,11 @@ export function SuccessPage() {
             )}
           </button>
 
-          {event?.whatsappLink && /^https?:\/\//i.test(event.whatsappLink) && (
+          {whatsappLink && /^https?:\/\//i.test(whatsappLink) && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-[14px] text-gray-500 mb-3">Join the event WhatsApp group to stay updated.</p>
               <a
-                href={event.whatsappLink}
+                href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold transition-all hover:opacity-90"
@@ -312,7 +316,7 @@ export function SuccessPage() {
 export function PaymentCallbackPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { setOrder } = useRegistration()
+  const { setOrder, setWhatsappLink } = useRegistration()
 
   useEffect(() => {
     const reference = searchParams.get('reference') ?? searchParams.get('trxref')
@@ -322,9 +326,12 @@ export function PaymentCallbackPage() {
     }
     verifyPayment(reference)
       .then((result) => {
-        const successStatuses = ['success', 'paid', 'completed', 'successful']
-        if (successStatuses.includes(result.status?.toLowerCase()) && result.order) {
+        const ok = ['success', 'paid', 'completed', 'successful'].includes(result.status?.toLowerCase())
+        if (ok && result.sponsorship) {
+          navigate('/payment/sponsor-success')
+        } else if (ok && result.order) {
           setOrder(result.order)
+          setWhatsappLink(result.whatsappLink ?? null)
           const orderNumber = result.order.orderNumber ?? result.order._id ?? ''
           navigate(`/payment/success?order=${encodeURIComponent(orderNumber)}`)
         } else {
