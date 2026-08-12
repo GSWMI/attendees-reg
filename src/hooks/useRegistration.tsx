@@ -36,46 +36,37 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [sponsorship, setSponsorship] = useState<SponsorshipData | null>(null)
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
 
+  // Set the quantity for a single option within a slot. Multiple options in the
+  // same slot can each hold their own quantity (a qty of 0 removes the option).
   const setQty = (day: number, slot: string, optionIndex: number, delta: number) => {
     setQuantities((prev) => {
-      const current = prev[day]?.[slot]?.quantity ?? 0
+      const current = prev[day]?.[slot]?.[optionIndex] ?? 0
       const newQty = Math.max(0, Math.min(5, current + delta))
-      if (newQty === 0 && !prev[day]?.[slot]) return prev
-      return {
-        ...prev,
-        [day]: {
-          ...(prev[day] ?? {}),
-          [slot]: { optionIndex, quantity: newQty },
-        },
-      }
+      const slotMap = { ...(prev[day]?.[slot] ?? {}) }
+      if (newQty === 0) delete slotMap[optionIndex]
+      else slotMap[optionIndex] = newQty
+      return { ...prev, [day]: { ...(prev[day] ?? {}), [slot]: slotMap } }
     })
   }
 
-  const selectOption = (day: number, slot: string, optionIndex: number) => {
-    setQuantities((prev) => ({
-      ...prev,
-      [day]: {
-        ...(prev[day] ?? {}),
-        [slot]: { optionIndex, quantity: prev[day]?.[slot]?.quantity ?? 0 },
-      },
-    }))
-  }
-
-  // Build mealSelections for API
+  // Build mealSelections for the API — one meal entry per selected option,
+  // referencing the option by its stable code.
   const mealSelections: MealSelection[] = []
   if (event?.mealOptions) {
     const dayMap: Record<number, MealSelection> = {}
     Object.entries(quantities).forEach(([dayStr, slots]) => {
       const day = Number(dayStr)
-      Object.entries(slots).forEach(([slot, val]) => {
-        const { optionIndex, quantity } = val as { optionIndex: number; quantity: number }
-        if (quantity === 0) return
-        const group = event.mealOptions?.find((g) => g.day === day && g.slot === slot)
-        if (!group) return
-        const opt = group.options[optionIndex]
-        if (!opt) return
-        if (!dayMap[day]) dayMap[day] = { day, meals: [] }
-        dayMap[day].meals.push({ slot, optionIndex, optionName: opt.name, price: opt.price, quantity })
+      Object.entries(slots).forEach(([slot, opts]) => {
+        Object.entries(opts as Record<string, number>).forEach(([optIdxStr, quantity]) => {
+          if (!quantity) return
+          const optionIndex = Number(optIdxStr)
+          const group = event.mealOptions?.find((g) => g.day === day && g.slot === slot)
+          if (!group) return
+          const opt = group.options[optionIndex]
+          if (!opt) return
+          if (!dayMap[day]) dayMap[day] = { day, meals: [] }
+          dayMap[day].meals.push({ slot, code: opt.code, optionName: opt.name, price: opt.price, quantity })
+        })
       })
     })
     mealSelections.push(...Object.values(dayMap))
@@ -108,7 +99,7 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
   return (
     <RegistrationContext.Provider value={{
       event, setEvent,
-      quantities, setQty, selectOption,
+      quantities, setQty,
       grandTotal, mealSelections,
       selectedAccommodationId, setSelectedAccommodationId,
       selectedTransportId, setSelectedTransportId,

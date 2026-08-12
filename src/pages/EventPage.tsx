@@ -63,7 +63,7 @@ export default function EventPage() {
   const navigate = useNavigate()
   const {
     event, setEvent,
-    quantities, setQty, selectOption,
+    quantities, setQty,
     grandTotal, mealSelections,
     selectedAccommodationId, setSelectedAccommodationId,
     selectedTransportId, setSelectedTransportId,
@@ -102,7 +102,7 @@ export default function EventPage() {
   // unchecked panel.
   useEffect(() => {
     const hasMealSel = Object.values(quantities).some((slots) =>
-      Object.values(slots).some((v) => (v as { quantity: number }).quantity > 0))
+      Object.values(slots).some((opts) => Object.values(opts as Record<string, number>).some((q) => q > 0)))
     if (hasMealSel) { setMealChecked(true); setMealOpen(true) }
     if (selectedAccommodationId) { setAccChecked(true); setAccOpen(true) }
     if (selectedTransportId) { setTransportChecked(true); setTransportOpen(true) }
@@ -324,7 +324,6 @@ export default function EventPage() {
                       mealGroups={(event.mealOptions ?? []).filter((g) => g.day === days[activeDay])}
                       quantities={quantities}
                       onQty={setQty}
-                      onSelect={selectOption}
                     />
                   ) : (
                     <MealSummary mealSelections={mealSelections} grandTotal={grandTotal} hasSelections={hasSelections} />
@@ -477,110 +476,101 @@ export default function EventPage() {
 
 // ── Day Content ───────────────────────────────────────────────────────────────
 
-function DayContent({ day, mealGroups, quantities, onQty, onSelect }: {
+function DayContent({ day, mealGroups, quantities, onQty }: {
   day: number
   mealGroups: { day: number; slot: string; options: { name: string; price: number }[] }[]
-  quantities: Record<number, Record<string, { optionIndex: number; quantity: number }>>
+  quantities: Record<number, Record<string, Record<number, number>>>
   onQty: (day: number, slot: string, optionIndex: number, delta: number) => void
-  onSelect: (day: number, slot: string, optionIndex: number) => void
 }) {
   if (mealGroups.length === 0) {
     return <div className="p-8 text-center text-[13px] text-gray-400">No meal options for this day</div>
   }
 
+  const qtyOf = (slot: string, i: number) => quantities[day]?.[slot]?.[i] ?? 0
+
   return (
     <div className="bg-white">
+      {/* Desktop: one row per option, each with its own qty stepper */}
       <div className="hidden md:block p-5">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left text-[12px] text-gray-500 font-medium pb-3 w-20">Slot</th>
+              <th className="text-left text-[12px] text-gray-500 font-medium pb-3 w-24">Slot</th>
               <th className="text-left text-[12px] text-gray-500 font-medium pb-3">Meal option × Price</th>
-              <th className="text-right text-[12px] text-gray-500 font-medium pb-3 w-40">Qty (Max. 5)</th>
+              <th className="text-right text-[12px] text-gray-500 font-medium pb-3 w-40">Qty (Max. 5 each)</th>
             </tr>
           </thead>
           <tbody>
-            {mealGroups.map((group) => {
-              const selected = quantities[day]?.[group.slot]
-              const qty = selected?.quantity ?? 0
-              const selectedIdx = selected?.optionIndex ?? 0
-              return (
-                <tr key={group.slot} className="border-b border-gray-50 last:border-0">
-                  <td className="py-4 text-[13px] font-medium text-gray-800 capitalize align-top">{group.slot}</td>
-                  <td className="py-4 pr-4">
-                    {group.options.map((opt, i) => (
-                      <label key={i} className="flex items-start gap-2 mb-2 last:mb-0 cursor-pointer group">
-                        <input type="radio" name={`slot-${day}-${group.slot}`}
-                          checked={selected?.optionIndex === i}
-                          onChange={() => onSelect(day, group.slot, i)}
-                          className="accent-[#3b5bdb] w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <span className="text-[13px] text-gray-600 group-hover:text-gray-900 transition-colors leading-snug">{opt.name}</span>
+            {mealGroups.map((group) => (
+              group.options.map((opt, i) => {
+                const qty = qtyOf(group.slot, i)
+                return (
+                  <tr key={`${group.slot}-${i}`} className="border-b border-gray-50 last:border-0">
+                    <td className="py-4 text-[13px] font-medium text-gray-800 capitalize align-middle">
+                      {i === 0 ? group.slot : ''}
+                    </td>
+                    <td className="py-4 pr-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[13px] leading-snug ${qty > 0 ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>{opt.name}</span>
                         <span className="text-[12px] text-gray-400 flex-shrink-0">–</span>
                         <span className="text-[13px] text-gray-800 font-medium whitespace-nowrap flex-shrink-0">₦{opt.price.toLocaleString()}</span>
-                      </label>
-                    ))}
-                  </td>
-                  <td className="py-4 align-middle">
-                    <div className="flex items-center justify-end gap-3">
-                      <button onClick={() => onQty(day, group.slot, selectedIdx, -1)}
-                        className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors">
-                        <Minus size={12} />
-                      </button>
-                      <span className="text-[14px] font-medium w-4 text-center">{qty}</span>
-                      <button onClick={() => onQty(day, group.slot, selectedIdx, 1)}
-                        className="w-7 h-7 rounded-full border border-[#3b5bdb] text-[#3b5bdb] flex items-center justify-center hover:bg-blue-50 transition-colors">
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+                      </div>
+                    </td>
+                    <td className="py-4 align-middle">
+                      <div className="flex items-center justify-end gap-3">
+                        <button onClick={() => onQty(day, group.slot, i, -1)}
+                          className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors">
+                          <Minus size={12} />
+                        </button>
+                        <span className="text-[14px] font-medium w-4 text-center">{qty}</span>
+                        <button onClick={() => onQty(day, group.slot, i, 1)}
+                          className="w-7 h-7 rounded-full border border-[#3b5bdb] text-[#3b5bdb] flex items-center justify-center hover:bg-blue-50 transition-colors">
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
+            ))}
           </tbody>
         </table>
       </div>
 
+      {/* Mobile: per slot, each option has its own stepper */}
       <div className="md:hidden flex flex-col divide-y divide-gray-100">
-        {mealGroups.map((group) => {
-          const selected = quantities[day]?.[group.slot]
-          const qty = selected?.quantity ?? 0
-          const selectedIdx = selected?.optionIndex ?? 0
-          return (
-            <div key={group.slot} className="p-4">
-              <div className="text-[12px] font-bold text-[#3b5bdb] uppercase tracking-wide mb-3 capitalize">{group.slot}</div>
-              <div className="flex flex-col gap-2 mb-4">
-                {group.options.map((opt, i) => (
-                  <label key={i} onClick={() => onSelect(day, group.slot, i)}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                      selected?.optionIndex === i ? 'border-[#3b5bdb] bg-blue-50/60' : 'border-gray-200 bg-white'
+        {mealGroups.map((group) => (
+          <div key={group.slot} className="p-4">
+            <div className="text-[12px] font-bold text-[#3b5bdb] uppercase tracking-wide mb-3 capitalize">{group.slot}</div>
+            <div className="flex flex-col gap-2">
+              {group.options.map((opt, i) => {
+                const qty = qtyOf(group.slot, i)
+                return (
+                  <div key={i}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      qty > 0 ? 'border-[#3b5bdb] bg-blue-50/60' : 'border-gray-200 bg-white'
                     }`}>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${selected?.optionIndex === i ? 'border-[#3b5bdb]' : 'border-gray-300'}`}>
-                        {selected?.optionIndex === i && <div className="w-2 h-2 rounded-full bg-[#3b5bdb]" />}
-                      </div>
-                      <span className="text-[13px] text-gray-700">{opt.name}</span>
+                    <div className="flex-1 min-w-0 pr-3">
+                      <p className="text-[13px] text-gray-800">{opt.name}</p>
+                      <p className="text-[13px] font-semibold text-gray-900">₦{opt.price.toLocaleString()}</p>
                     </div>
-                    <span className="text-[13px] font-semibold text-gray-800 whitespace-nowrap ml-2">₦{opt.price.toLocaleString()}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                <span className="text-[13px] text-gray-600">Quantity <span className="text-[11px] text-gray-400">(max 5)</span></span>
-                <div className="flex items-center gap-4">
-                  <button onClick={() => onQty(day, group.slot, selectedIdx, -1)}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                    <Minus size={13} />
-                  </button>
-                  <span className="text-[16px] font-semibold text-gray-900 w-5 text-center">{qty}</span>
-                  <button onClick={() => onQty(day, group.slot, selectedIdx, 1)}
-                    className="w-8 h-8 rounded-full border border-[#3b5bdb] text-[#3b5bdb] flex items-center justify-center hover:bg-blue-50 transition-colors">
-                    <Plus size={13} />
-                  </button>
-                </div>
-              </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <button onClick={() => onQty(day, group.slot, i, -1)}
+                        className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors">
+                        <Minus size={13} />
+                      </button>
+                      <span className="text-[15px] font-semibold text-gray-900 w-4 text-center">{qty}</span>
+                      <button onClick={() => onQty(day, group.slot, i, 1)}
+                        className="w-8 h-8 rounded-full border border-[#3b5bdb] text-[#3b5bdb] flex items-center justify-center hover:bg-blue-50 transition-colors">
+                        <Plus size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
     </div>
   )

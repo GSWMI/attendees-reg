@@ -1,11 +1,12 @@
 import { createContext, type Dispatch, type SetStateAction } from 'react'
 import type { EventData, MealSelection, OrderData, SponsorshipData } from '../services/api'
 
+// Meal quantities: per day → per slot → per option index → quantity.
+// Multiple options can be selected within the same slot (each with its own qty).
 export interface QuantityMap {
   [day: number]: {
     [slot: string]: {
-      optionIndex: number
-      quantity: number
+      [optionIndex: number]: number
     }
   }
 }
@@ -67,7 +68,6 @@ export interface RegistrationContextValue {
   setEvent: (e: EventData) => void
   quantities: QuantityMap
   setQty: (day: number, slot: string, optionIndex: number, delta: number) => void
-  selectOption: (day: number, slot: string, optionIndex: number) => void
   grandTotal: number
   mealSelections: MealSelection[]
   selectedAccommodationId: string
