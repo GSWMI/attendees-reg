@@ -25,8 +25,10 @@ function normalizeId<T extends Record<string, unknown>>(obj: T): T {
 // ── Event ─────────────────────────────────────────────────────────────────────
 
 export interface MealOptionItem {
+  code: string          // stable id; orders reference options by code
   name: string
   price: number
+  maxPerOrder?: number | null
   limit?: number | null
 }
 
@@ -132,9 +134,9 @@ export interface MealSelection {
   day: number
   meals: {
     slot: string
-    optionIndex: number
-    optionName: string
-    price: number
+    code: string         // backend identifies the option by code
+    optionName: string   // kept for display in summaries
+    price: number        // kept for display/totals
     quantity: number
   }[]
 }
