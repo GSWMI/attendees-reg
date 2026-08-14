@@ -77,7 +77,9 @@ export default function EventPage() {
   const [accOpen, setAccOpen] = useState(false)
   const [transportChecked, setTransportChecked] = useState(false)
   const [transportOpen, setTransportOpen] = useState(false)
-  const [activeDay, setActiveDay] = useState(0)
+  // Which day accordions are expanded (multiple can be open). Day 1 opens by default.
+  const [openDays, setOpenDays] = useState<Record<number, boolean>>({ 1: true })
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
 
   useEffect(() => {
@@ -161,8 +163,15 @@ export default function EventPage() {
   }
 
   const days = event.totalDays ? Array.from({ length: event.totalDays }, (_, i) => i + 1) : []
-  const tabs = [...days.map((d) => `Day ${d}`), 'Total meal summary']
   const hasSelections = mealSelections.length > 0 && mealSelections.some((s) => s.meals.length > 0)
+  // Per-day pack count + subtotal, for the badge shown on each day's accordion header.
+  const daySummary: Record<number, { count: number; subtotal: number }> = {}
+  mealSelections.forEach((sel) => {
+    const count = sel.meals.reduce((n, m) => n + m.quantity, 0)
+    const subtotal = sel.meals.reduce((n, m) => n + m.price * m.quantity, 0)
+    daySummary[sel.day] = { count, subtotal }
+  })
+  const toggleDay = (d: number) => setOpenDays((prev) => ({ ...prev, [d]: !prev[d] }))
   const accommodations: AccommodationData[] = event.accommodations ?? []
   const transports: TransportData[] = event.transport ?? []
   const hasMeal = event.mealRegistrationOpen && event.mealOptions && event.mealOptions.length > 0
@@ -307,27 +316,52 @@ export default function EventPage() {
                 </button>
               </div>
               {mealChecked && mealOpen && (
-                <div className="border-t border-gray-200">
-                  <div className="flex border-b border-gray-200 overflow-x-auto bg-white">
-                    {tabs.map((tab, i) => (
-                      <button key={tab} onClick={() => setActiveDay(i)}
-                        className={`px-4 py-3 text-[13px] font-medium transition-colors border-b-2 -mb-px whitespace-nowrap flex-shrink-0 ${
-                          activeDay === i ? 'border-[#0d1b2a] text-[#0d1b2a]' : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}>
-                        {tab}
-                      </button>
-                    ))}
+                <div className="border-t border-gray-200 p-3 md:p-4 flex flex-col gap-3 bg-white">
+                  {/* One accordion per day, so every day is visible and clearly separate */}
+                  {days.map((d) => {
+                    const isOpen = !!openDays[d]
+                    const sum = daySummary[d]
+                    return (
+                      <div key={d} className="rounded-xl border border-gray-200 overflow-hidden" style={{ backgroundColor: '#F5F8FF' }}>
+                        <button onClick={() => toggleDay(d)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-left">
+                          <span className="flex items-center gap-2">
+                            <span className="text-[13px] font-bold text-[#3b5bdb] uppercase tracking-wide">Day {d}</span>
+                            {sum && sum.count > 0 && (
+                              <span className="text-[11px] font-medium text-[#3b5bdb] bg-blue-100 rounded-full px-2 py-0.5">
+                                {sum.count} pack{sum.count > 1 ? 's' : ''} · ₦{sum.subtotal.toLocaleString()}
+                              </span>
+                            )}
+                          </span>
+                          {isOpen ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+                        </button>
+                        {isOpen && (
+                          <div className="border-t border-gray-200">
+                            <DayContent
+                              day={d}
+                              mealGroups={(event.mealOptions ?? []).filter((g) => g.day === d)}
+                              quantities={quantities}
+                              onQty={setQty}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Overall meal selection summary */}
+                  <div className="rounded-xl border border-gray-200 overflow-hidden" style={{ backgroundColor: '#F5F8FF' }}>
+                    <button onClick={() => setSummaryOpen((v) => !v)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left">
+                      <span className="text-[13px] font-bold text-[#3b5bdb] uppercase tracking-wide">Meal selection summary</span>
+                      {summaryOpen ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+                    </button>
+                    {summaryOpen && (
+                      <div className="border-t border-gray-200">
+                        <MealSummary mealSelections={mealSelections} grandTotal={grandTotal} hasSelections={hasSelections} />
+                      </div>
+                    )}
                   </div>
-                  {activeDay < days.length ? (
-                    <DayContent
-                      day={days[activeDay]}
-                      mealGroups={(event.mealOptions ?? []).filter((g) => g.day === days[activeDay])}
-                      quantities={quantities}
-                      onQty={setQty}
-                    />
-                  ) : (
-                    <MealSummary mealSelections={mealSelections} grandTotal={grandTotal} hasSelections={hasSelections} />
-                  )}
                 </div>
               )}
             </div>
