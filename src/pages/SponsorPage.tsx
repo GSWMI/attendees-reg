@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Mail, Phone } from 'lucide-react'
+import { ArrowLeft, User, Mail, Phone, X, Minus, Plus, ChevronDown } from 'lucide-react'
 import { useRegistration } from '../hooks/useRegistration.ts'
-import type { SponsorshipCategory } from '../services/api'
-import { getUnitPrice } from '../lib/sponsorship'
+import type { SponsorshipCategoryKey } from '../hooks/registrationContext'
+import {
+  sponsorshipMealPrice, sponsorshipTransportPrice, accommodationSponsorItems,
+  sponsorshipConfigured, type SponsorAccItem,
+} from '../lib/sponsorship'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -13,6 +16,10 @@ function isValidPhone(raw: string): boolean {
   if (!/^\+?[\d\s()-]+$/.test(value)) return false
   const digits = value.replace(/\D/g, '')
   return digits.length >= 10 && digits.length <= 15
+}
+
+const CATEGORY_LABELS: Record<SponsorshipCategoryKey, string> = {
+  meal: 'Meal', transport: 'Transport', accommodation: 'Accommodation',
 }
 
 export default function SponsorPage() {
@@ -27,13 +34,52 @@ export default function SponsorPage() {
 
   if (!event) return null
 
+  const mealPrice = sponsorshipMealPrice(event)
+  const transportPrice = sponsorshipTransportPrice(event)
+  const accommodations = accommodationSponsorItems(event)
+  const configured = sponsorshipConfigured(event)
+
+  // Only categories with configured sponsorship pricing.
+  const available: SponsorshipCategoryKey[] = [
+    ...(mealPrice != null ? (['meal'] as const) : []),
+    ...(transportPrice != null ? (['transport'] as const) : []),
+    ...(accommodations.length ? (['accommodation'] as const) : []),
+  ]
+  const unselected = available.filter((c) => !sponsor.categories.includes(c))
+
   const update = (field: keyof typeof sponsor, value: string) => {
     setSponsor((p) => ({ ...p, [field]: value }))
     setErrors((p) => ({ ...p, [field]: '' }))
   }
 
-  const isSpecific = sponsor.sponsorshipType === 'specific'
-  const isGeneral = sponsor.sponsorshipType === 'general'
+  const addCategory = (c: SponsorshipCategoryKey) => {
+    if (!c || sponsor.categories.includes(c)) return
+    setSponsor((p) => ({ ...p, categories: [...p.categories, c] }))
+    setErrors((p) => ({ ...p, categories: '' }))
+  }
+  const removeCategory = (c: SponsorshipCategoryKey) => {
+    setSponsor((p) => {
+      const next = { ...p, categories: p.categories.filter((x) => x !== c) }
+      if (c === 'meal') next.mealPersons = 0
+      if (c === 'transport') next.transportPersons = 0
+      if (c === 'accommodation') next.accommodationPersons = {}
+      return next
+    })
+  }
+
+  const setMealPersons = (delta: number) => setSponsor((p) => ({ ...p, mealPersons: Math.max(0, p.mealPersons + delta) }))
+  const setTransportPersons = (delta: number) => setSponsor((p) => ({ ...p, transportPersons: Math.max(0, p.transportPersons + delta) }))
+  const setAccPersons = (id: string, delta: number) => setSponsor((p) => {
+    const cur = p.accommodationPersons[id] ?? 0
+    const nv = Math.max(0, cur + delta)
+    const a = { ...p.accommodationPersons }
+    if (nv === 0) delete a[id]; else a[id] = nv
+    return { ...p, accommodationPersons: a }
+  })
+
+  const totalSelectedPersons =
+    sponsor.mealPersons + sponsor.transportPersons +
+    Object.values(sponsor.accommodationPersons).reduce((a, b) => a + b, 0)
 
   const validate = () => {
     const errs: Record<string, string> = {}
@@ -42,19 +88,8 @@ export default function SponsorPage() {
     if (!sponsor.email.trim()) errs.email = 'Required'
     else if (!emailRe.test(sponsor.email)) errs.email = 'Invalid email'
     if (sponsor.phone.trim() && !isValidPhone(sponsor.phone)) errs.phone = 'Invalid phone number'
-    if (!sponsor.sponsorshipType) errs.sponsorshipType = 'Required'
-
-    if (isGeneral) {
-      const amt = Number(sponsor.amount)
-      if (!sponsor.amount.trim()) errs.amount = 'Required'
-      else if (!Number.isFinite(amt) || amt <= 0) errs.amount = 'Enter a valid amount'
-    }
-    if (isSpecific) {
-      if (!sponsor.category) errs.category = 'Required'
-      const n = Number(sponsor.numberOfPersons)
-      if (!sponsor.numberOfPersons.trim()) errs.numberOfPersons = 'Required'
-      else if (!Number.isInteger(n) || n < 1) errs.numberOfPersons = 'Enter a whole number (1 or more)'
-    }
+    if (sponsor.categories.length === 0) errs.categories = 'Select at least one category'
+    else if (totalSelectedPersons === 0) errs.categories = 'Enter the number of persons for at least one category'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -63,10 +98,6 @@ export default function SponsorPage() {
     if (!validate()) return
     navigate(`/events/s/${slug}/sponsor/review`)
   }
-
-  const unit = isSpecific && sponsor.category
-    ? getUnitPrice(event, sponsor.category as SponsorshipCategory)
-    : null
 
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
@@ -81,6 +112,19 @@ export default function SponsorPage() {
           <h1 className="text-[22px] font-bold text-[#0d1b2a]">Choose how you want to sponsor</h1>
         </div>
 
+        {!configured ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-5">
+            <p className="text-[14px] font-semibold text-amber-800 mb-1">Sponsorship isn't available for this event yet</p>
+            <p className="text-[13px] text-amber-700">
+              The organiser hasn't set up sponsorship pricing for this event. Please check back later,
+              or you can still support the event by making a donation.
+            </p>
+            <button onClick={() => navigate(`/events/s/${slug}/donate`)}
+              className="mt-3 px-5 py-2.5 bg-[#3b5bdb] text-white rounded-lg text-[14px] font-medium hover:bg-[#3451c7] transition-colors">
+              Donate instead
+            </button>
+          </div>
+        ) : (
         <div className="flex flex-col gap-4">
           {/* Sponsor details */}
           <div className="bg-[#f7f7f5] rounded-2xl p-5 md:p-6 flex flex-col gap-4">
@@ -103,62 +147,76 @@ export default function SponsorPage() {
             </Field>
           </div>
 
-          {/* Sponsorship type + details */}
+          {/* Category multi-select + per-category steppers */}
           <div className="bg-[#f7f7f5] rounded-2xl p-5 md:p-6 flex flex-col gap-4">
-            <Field label="Sponsorship type" required error={errors.sponsorshipType}>
-              <select value={sponsor.sponsorshipType}
-                onChange={(e) => update('sponsorshipType', e.target.value)}
-                className={selectClass(!!errors.sponsorshipType, !sponsor.sponsorshipType)}>
-                <option value="" disabled>Choose an option</option>
-                <option value="general">General sponsorship (open amount)</option>
-                <option value="specific">Specific sponsorship</option>
-              </select>
+            <Field label="Category" required error={errors.categories}>
+              <div className="relative">
+                <select value=""
+                  onChange={(e) => { addCategory(e.target.value as SponsorshipCategoryKey); e.target.value = '' }}
+                  disabled={unselected.length === 0}
+                  className={selectClass(!!errors.categories)}>
+                  <option value="" disabled>{unselected.length ? 'Choose from list' : 'All categories added'}</option>
+                  {unselected.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
             </Field>
 
-            {isGeneral && (
-              <Field label="Enter amount" required error={errors.amount}>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[14px] z-10">₦</span>
-                  <input inputMode="numeric"
-                    value={sponsor.amount ? Number(sponsor.amount).toLocaleString() : ''}
-                    onChange={(e) => update('amount', e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="50,000" className={amountInputClass(!!errors.amount)} />
-                </div>
-              </Field>
+            {sponsor.categories.length > 0 && (
+              <div className="flex flex-wrap gap-2 -mt-1">
+                {sponsor.categories.map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1.5 bg-gray-200 text-gray-700 text-[13px] rounded-full pl-3 pr-1.5 py-1">
+                    {CATEGORY_LABELS[c]}
+                    <button onClick={() => removeCategory(c)} className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
             )}
 
-            {isSpecific && (
-              <>
-                <Field label="Category" required error={errors.category}>
-                  <select value={sponsor.category}
-                    onChange={(e) => update('category', e.target.value)}
-                    className={selectClass(!!errors.category, !sponsor.category)}>
-                    <option value="" disabled>Choose an option</option>
-                    <option value="meal">Meal</option>
-                    <option value="accommodation">Accommodation</option>
-                    <option value="transport">Transport</option>
-                  </select>
-                </Field>
-                <Field label="No. of persons you want to sponsor" required error={errors.numberOfPersons}>
-                  <input inputMode="numeric" value={sponsor.numberOfPersons}
-                    onChange={(e) => update('numberOfPersons', e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="1" className={inputClass(!!errors.numberOfPersons)} />
-                </Field>
-                {unit && (
-                  <p className="text-[12px] text-gray-500">
-                    Cost per person: <span className="font-medium text-gray-700">₦{unit.price.toLocaleString()}</span>
-                    {unit.isPlaceholder && <span className="text-amber-600"> (placeholder — pending admin pricing)</span>}
-                  </p>
-                )}
-              </>
+            {/* Meal — single price */}
+            {sponsor.categories.includes('meal') && mealPrice != null && (
+              <div className="border-t border-gray-200 pt-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[14px] font-semibold text-gray-800">Meal</p>
+                  <p className="text-[12px] text-gray-500">₦{mealPrice.toLocaleString()} per pack</p>
+                </div>
+                <Stepper count={sponsor.mealPersons} onDec={() => setMealPersons(-1)} onInc={() => setMealPersons(1)} />
+              </div>
+            )}
+
+            {/* Transport — single flat price */}
+            {sponsor.categories.includes('transport') && transportPrice != null && (
+              <div className="border-t border-gray-200 pt-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[14px] font-semibold text-gray-800">Transport</p>
+                  <p className="text-[12px] text-gray-500">₦{transportPrice.toLocaleString()} flat fee per person</p>
+                </div>
+                <Stepper count={sponsor.transportPersons} onDec={() => setTransportPersons(-1)} onInc={() => setTransportPersons(1)} />
+              </div>
+            )}
+
+            {/* Accommodation — sub-options */}
+            {sponsor.categories.includes('accommodation') && accommodations.length > 0 && (
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-[14px] font-semibold text-gray-800 mb-2">Accommodation</p>
+                <div className="flex flex-col gap-3">
+                  {accommodations.map((a) => (
+                    <AccRow key={a.identifier} item={a} count={sponsor.accommodationPersons[a.identifier] ?? 0}
+                      onDec={() => setAccPersons(a.identifier, -1)} onInc={() => setAccPersons(a.identifier, 1)} />
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
           <div>
             <button onClick={handleContinue}
-              disabled={!sponsor.sponsorshipType}
+              disabled={sponsor.categories.length === 0 || totalSelectedPersons === 0}
               className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg text-[15px] font-semibold transition-all ${
-                sponsor.sponsorshipType ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                sponsor.categories.length > 0 && totalSelectedPersons > 0
+                  ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}>
               Continue
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -167,6 +225,7 @@ export default function SponsorPage() {
             </button>
           </div>
         </div>
+        )}
       </main>
 
       <Footer />
@@ -175,6 +234,38 @@ export default function SponsorPage() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function AccRow({ item, count, onDec, onInc }: { item: SponsorAccItem; count: number; onDec: () => void; onInc: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start gap-2.5 flex-1 min-w-0">
+        <span className={`mt-1 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${count > 0 ? 'bg-[#3b5bdb] border-[#3b5bdb]' : 'border-gray-300 bg-white'}`}>
+          {count > 0 && <svg width="9" height="7" viewBox="0 0 11 9" fill="none"><path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[14px] text-gray-800">{item.name}</p>
+          <p className="text-[12px] text-gray-500">₦{item.price.toLocaleString()} per person</p>
+        </div>
+      </div>
+      <Stepper count={count} onDec={onDec} onInc={onInc} />
+    </div>
+  )
+}
+
+function Stepper({ count, onDec, onInc }: { count: number; onDec: () => void; onInc: () => void }) {
+  return (
+    <div className="flex items-center gap-2.5 shrink-0">
+      <button onClick={onDec} className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors">
+        <Minus size={12} />
+      </button>
+      <span className="text-[14px] font-medium w-4 text-center">{count}</span>
+      <button onClick={onInc} className="w-7 h-7 rounded-full border border-[#3b5bdb] text-[#3b5bdb] flex items-center justify-center hover:bg-blue-50 transition-colors">
+        <Plus size={12} />
+      </button>
+      <span className="text-[12px] text-gray-400 w-12">persons</span>
+    </div>
+  )
+}
 
 function Field({ label, required, error, icon, children }: {
   label: string; required?: boolean; error?: string; icon?: React.ReactNode; children: React.ReactNode
@@ -195,26 +286,14 @@ function Field({ label, required, error, icon, children }: {
 
 function inputClass(hasError: boolean) {
   return `w-full border rounded-lg pl-9 pr-4 py-3 text-[14px] bg-white placeholder:text-gray-400 outline-none transition-all ${
-    hasError
-      ? 'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100'
-      : 'border-gray-300 focus:border-[#3b5bdb] focus:ring-1 focus:ring-[#3b5bdb]/20'
+    hasError ? 'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100'
+             : 'border-gray-300 focus:border-[#3b5bdb] focus:ring-1 focus:ring-[#3b5bdb]/20'
   }`
 }
 
-function amountInputClass(hasError: boolean) {
-  return `w-full border rounded-lg pl-8 pr-4 py-3 text-[14px] bg-white placeholder:text-gray-400 outline-none transition-all ${
-    hasError
-      ? 'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100'
-      : 'border-gray-300 focus:border-[#3b5bdb] focus:ring-1 focus:ring-[#3b5bdb]/20'
-  }`
-}
-
-function selectClass(hasError: boolean, placeholder: boolean) {
-  return `w-full border rounded-lg px-4 py-3 text-[14px] bg-white outline-none transition-all appearance-none ${
-    placeholder ? 'text-gray-400' : 'text-gray-800'
-  } ${
-    hasError
-      ? 'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100'
-      : 'border-gray-300 focus:border-[#3b5bdb] focus:ring-1 focus:ring-[#3b5bdb]/20'
+function selectClass(hasError: boolean) {
+  return `w-full border rounded-lg px-4 py-3 pr-10 text-[14px] bg-white outline-none transition-all appearance-none text-gray-500 ${
+    hasError ? 'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-100'
+             : 'border-gray-300 focus:border-[#3b5bdb] focus:ring-1 focus:ring-[#3b5bdb]/20'
   }`
 }

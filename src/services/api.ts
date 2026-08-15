@@ -85,12 +85,12 @@ export interface EventData {
   accommodations?: AccommodationData[]
   transport?: TransportData[]
   // Per-person unit prices for Specific Sponsorship. Set once by the admin on
-  // the event. PENDING BACKEND — the UI falls back to placeholders until this
-  // is returned by GET /events/s/:slug.
+  // the event; returned by GET /events/s/:slug. Absent when the admin hasn't
+  // configured sponsorship pricing (the sponsor flow gates in that case).
   sponsorshipUnitPrices?: {
     meal?: number
     transport?: number
-    accommodation?: { accommodationId: string; name: string; pricePerPerson: number }[]
+    accommodation?: { accommodationId: string; name?: string; pricePerPerson: number }[]
   }
 }
 
@@ -183,6 +183,8 @@ export interface OrderData {
     gender: string
     nextOfKin: { fullName: string; email: string; phone: string; whatsappNumber: string }
   }
+  // Present when someone paid for another registrant (pay for someone else).
+  purchaser?: PurchaserData
   mealSelections: MealSelection[]
   qrCodes?: {
     code: string
@@ -222,13 +224,16 @@ export async function calculateOrder(
   return data.data ?? (data as unknown as { totalAmount: number; breakdown: Record<string, number> })
 }
 
-// Payment is now handled by a context-aware router that serves both orders and
-// sponsorships (replaces the old /orders/:id/pay path).
-export type PaymentContext = 'order' | 'sponsorship'
+// Payment is handled by a context-aware router serving orders, sponsorships
+// and donations (replaces the old /orders/:id/pay path).
+export type PaymentContext = 'order' | 'sponsorship' | 'donation'
 
-// The payment context is encoded in the reference prefix by the backend.
+// The payment context is encoded in the reference prefix by the backend
+// (PAY_ORD_… / PAY_SPN_… / PAY_DON_…).
 export function contextFromReference(reference: string): PaymentContext {
-  return /^PAY[_-]?SPN/i.test(reference) ? 'sponsorship' : 'order'
+  if (/^PAY[_-]?SPN/i.test(reference)) return 'sponsorship'
+  if (/^PAY[_-]?DON/i.test(reference)) return 'donation'
+  return 'order'
 }
 
 // POST /payments/:context/:resourceId/initiate
@@ -258,54 +263,84 @@ export async function initiatePayment(
 // on the public event read). Sponsorship verify returns the sponsorship object.
 export async function verifyPayment(
   reference: string
-): Promise<{ status: string; order?: OrderData; sponsorship?: SponsorshipData; whatsappLink?: string }> {
+): Promise<{
+  status: string
+  context: PaymentContext
+  order?: OrderData
+  sponsorship?: SponsorshipData
+  donation?: DonationData
+  whatsappLink?: string
+}> {
   const data = await request<{ success: boolean; data: Record<string, unknown> }>(
     `/payments/verify/${reference}`
   )
   const inner = (data.data ?? (data as unknown as Record<string, unknown>)) as Record<string, unknown>
-  const isSponsorship = contextFromReference(reference) === 'sponsorship'
-    || !!inner.sponsorship || !!inner.sponsorshipType
+  const ctx = contextFromReference(reference)
 
-  if (isSponsorship) {
+  if (ctx === 'sponsorship' || inner.sponsorship) {
     const rawSp = (inner.sponsorship ?? inner) as Record<string, unknown>
     const sponsorship = normalizeId(rawSp) as unknown as SponsorshipData
     const status = String(rawSp.paymentStatus ?? rawSp.status ?? 'unknown')
-    return { status, sponsorship }
+    return { status, context: 'sponsorship', sponsorship }
+  }
+
+  if (ctx === 'donation' || inner.donation) {
+    const rawD = (inner.donation ?? inner) as Record<string, unknown>
+    const donation = normalizeId(rawD) as unknown as DonationData
+    const status = String(rawD.paymentStatus ?? rawD.status ?? 'unknown')
+    return { status, context: 'donation', donation }
   }
 
   const rawOrder = (inner.order ?? inner) as Record<string, unknown>
   const order = normalizeId(rawOrder) as unknown as OrderData
   const status = String(rawOrder.status ?? rawOrder.paymentStatus ?? 'unknown')
-  // whatsappLink may sit alongside the order or on it
   const whatsappLink = (inner.whatsappLink ?? rawOrder.whatsappLink) as string | undefined
-  return { status, order, whatsappLink }
+  return { status, context: 'order', order, whatsappLink }
 }
 
-// ── Sponsorship ─────────────────────────────────────────────────────────────
+// ── Sponsorship (sponsor individuals across categories) ──────────────────────
 
-export type SponsorshipType = 'general' | 'specific'
 export type SponsorshipCategory = 'meal' | 'accommodation' | 'transport'
+
+// One selected item within a category (meal option or accommodation type),
+// identified by its code/id, with the number of persons sponsored.
+export interface CategoryItemSelection {
+  identifier: string
+  numberOfPersons: number
+}
+
+// Categories payload. meal & transport are single flat counts (one configured
+// sponsorship price each); accommodation is an array of per-type selections.
+export interface SponsorshipCategories {
+  meal?: number
+  transport?: number
+  accommodation?: CategoryItemSelection[]
+}
 
 export interface CreateSponsorshipPayload {
   eventId: string
   sponsor: { name: string; email: string; phone: string }
-  sponsorshipType: SponsorshipType
-  category?: SponsorshipCategory // required when sponsorshipType === 'specific'
-  numberOfPersons?: number
-  amount: number
+  categories: SponsorshipCategories
+}
+
+// Per-category computed breakdown returned by the backend.
+export interface SponsorshipCategoryDetails {
+  meal?: { numberOfPersons: number; amount: number; identifier?: string } | { numberOfPersons: number; amount: number; identifier?: string }[]
+  transport?: { numberOfPersons: number; amount: number }
+  accommodation?: { numberOfPersons: number; amount: number; identifier?: string }[]
 }
 
 export interface SponsorshipData {
   _id: string
   id?: string
+  referenceNumber?: string
   status?: string
   paymentStatus?: string
   eventId: string
   sponsor: { name: string; email: string; phone: string }
-  sponsorshipType: SponsorshipType
-  category?: SponsorshipCategory
-  numberOfPersons?: number
+  categoryDetails?: SponsorshipCategoryDetails
   amount: number
+  totalAmount?: number
 }
 
 // POST /sponsorships → returns the created sponsorship (id used as the payment resourceId)
@@ -317,6 +352,39 @@ export async function createSponsorship(payload: CreateSponsorshipPayload): Prom
   const inner = (data as { data?: unknown }).data ?? data
   const raw = ((inner as { sponsorship?: SponsorshipData }).sponsorship ?? inner) as Record<string, unknown>
   return normalizeId(raw) as unknown as SponsorshipData
+}
+
+// ── Donation (open amount) ───────────────────────────────────────────────────
+
+export interface CreateDonationPayload {
+  eventId: string
+  sponsor: { name: string; email: string; phone: string }
+  amount: number
+  isAnonymous: boolean
+}
+
+export interface DonationData {
+  _id: string
+  id?: string
+  referenceNumber?: string
+  status?: string
+  paymentStatus?: string
+  eventId: string
+  sponsor: { name: string; email: string; phone: string }
+  isAnonymous?: boolean
+  amount: number
+  totalAmount?: number
+}
+
+// POST /donations → returns the created donation (id used as the payment resourceId)
+export async function createDonation(payload: CreateDonationPayload): Promise<DonationData> {
+  const data = await request<{ success: boolean; data: { donation?: DonationData } | DonationData }>(
+    '/donations',
+    { method: 'POST', body: JSON.stringify(payload) }
+  )
+  const inner = (data as { data?: unknown }).data ?? data
+  const raw = ((inner as { donation?: DonationData }).donation ?? inner) as Record<string, unknown>
+  return normalizeId(raw) as unknown as DonationData
 }
 
 // GET /orders/lookup/:orderNumber

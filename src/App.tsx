@@ -7,6 +7,8 @@ import RegisterPage from './pages/RegisterPage'
 import ReviewPage from './pages/ReviewPage'
 import SponsorPage from './pages/SponsorPage'
 import SponsorReviewPage from './pages/SponsorReviewPage'
+import DonatePage from './pages/DonatePage'
+import DonateReviewPage from './pages/DonateReviewPage'
 import {
   PleaseWaitPage,
   PaymentFailedPage,
@@ -60,6 +62,10 @@ export default function App() {
           <Route path="/events/s/:slug/sponsor" element={<SponsorPage />} />
           <Route path="/events/s/:slug/sponsor/review" element={<SponsorReviewPage />} />
           <Route path="/events/s/:slug/sponsor/success" element={<SponsorSuccessPage />} />
+
+          {/* Donation */}
+          <Route path="/events/s/:slug/donate" element={<DonatePage />} />
+          <Route path="/events/s/:slug/donate/review" element={<DonateReviewPage />} />
 
           {/* Payment states */}
           <Route path="/events/s/:slug/please-wait" element={<PleaseWaitPage />} />

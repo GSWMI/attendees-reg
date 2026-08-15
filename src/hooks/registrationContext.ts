@@ -1,5 +1,5 @@
 import { createContext, type Dispatch, type SetStateAction } from 'react'
-import type { EventData, MealSelection, OrderData, SponsorshipData } from '../services/api'
+import type { EventData, MealSelection, OrderData, SponsorshipData, DonationData } from '../services/api'
 
 // Meal quantities: per day → per slot → per option index → quantity.
 // Multiple options can be selected within the same slot (each with its own qty).
@@ -34,7 +34,7 @@ export const emptyGuestForm: GuestForm = {
 }
 
 // Which registration path the user picked on the landing screen.
-export type RegMode = 'myself' | 'someone-else' | 'sponsor'
+export type RegMode = 'myself' | 'someone-else' | 'sponsor' | 'donate'
 
 // Payer details, collected only in the "someone else" flow.
 export interface PurchaserForm {
@@ -46,21 +46,39 @@ export interface PurchaserForm {
 
 export const emptyPurchaser: PurchaserForm = { firstName: '', lastName: '', email: '', phone: '' }
 
-// Sponsorship form draft (sponsor details + what they're sponsoring).
+// Sponsor-individuals draft: sponsor details + persons per selected item.
+// mealPersons/accommodationPersons are keyed by option identifier (meal code /
+// accommodation id); transportPersons is a single flat count.
 export interface SponsorForm {
   firstName: string
   lastName: string
   email: string
   phone: string
-  sponsorshipType: '' | 'general' | 'specific'
-  category: '' | 'meal' | 'accommodation' | 'transport'
-  numberOfPersons: string // kept as string for the input; parsed on submit
-  amount: string          // general sponsorship free-form amount
+  categories: SponsorshipCategoryKey[]  // which category chips are active
+  mealPersons: number                   // single meal sponsorship price → one count
+  transportPersons: number              // single transport price → one count
+  accommodationPersons: Record<string, number> // by accommodation id (per type)
 }
+
+export type SponsorshipCategoryKey = 'meal' | 'transport' | 'accommodation'
 
 export const emptySponsorForm: SponsorForm = {
   firstName: '', lastName: '', email: '', phone: '',
-  sponsorshipType: '', category: '', numberOfPersons: '', amount: '',
+  categories: [], mealPersons: 0, transportPersons: 0, accommodationPersons: {},
+}
+
+// Donate draft (open amount).
+export interface DonateForm {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  amount: string       // kept as string for the input; parsed on submit
+  isAnonymous: boolean
+}
+
+export const emptyDonateForm: DonateForm = {
+  firstName: '', lastName: '', email: '', phone: '', amount: '', isAnonymous: false,
 }
 
 export interface RegistrationContextValue {
@@ -87,14 +105,19 @@ export interface RegistrationContextValue {
   setCustomAnswers: Dispatch<SetStateAction<Record<string, string>>>
   consent: boolean
   setConsent: Dispatch<SetStateAction<boolean>>
-  // Sponsorship draft — persisted across the sponsor form/review steps
+  // Sponsor-individuals draft — persisted across the sponsor form/review steps
   sponsor: SponsorForm
   setSponsor: Dispatch<SetStateAction<SponsorForm>>
+  // Donate draft
+  donate: DonateForm
+  setDonate: Dispatch<SetStateAction<DonateForm>>
   order: OrderData | null
   setOrder: (o: OrderData) => void
   clearOrder: () => void
   sponsorship: SponsorshipData | null
   setSponsorship: (s: SponsorshipData | null) => void
+  donation: DonationData | null
+  setDonation: (d: DonationData | null) => void
   // WhatsApp group link — only returned by the payment verify endpoint, so it's
   // captured there and read on the success page.
   whatsappLink: string | null

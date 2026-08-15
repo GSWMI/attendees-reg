@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Users, DollarSign } from 'lucide-react'
+import { ArrowLeft, User, Users, HandCoins, HeartHandshake } from 'lucide-react'
 import { getEventBySlug } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import type { RegMode } from '../hooks/registrationContext'
@@ -26,7 +26,11 @@ export default function ChoicePage() {
 
   const choose = (mode: RegMode) => {
     setMode(mode)
-    navigate(mode === 'sponsor' ? `/events/s/${slug}/sponsor` : `/events/s/${slug}/tickets`)
+    const dest =
+      mode === 'sponsor' ? `/events/s/${slug}/sponsor`
+      : mode === 'donate' ? `/events/s/${slug}/donate`
+      : `/events/s/${slug}/tickets`
+    navigate(dest)
   }
 
   if (loading) {
@@ -70,7 +74,7 @@ export default function ChoicePage() {
 
         <p className="text-[15px] text-gray-700 mb-6">Choose any of the options below to continue</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <ChoiceCard
             onClick={() => choose('myself')}
             icon={<User size={30} className="text-[#3b5bdb]" strokeWidth={1.5} />}
@@ -85,9 +89,15 @@ export default function ChoicePage() {
           />
           <ChoiceCard
             onClick={() => choose('sponsor')}
-            icon={<DollarSign size={30} className="text-[#0f9d7a]" strokeWidth={1.5} />}
-            title="I want to sponsor this event"
+            icon={<HeartHandshake size={30} className="text-[#0f9d7a]" strokeWidth={1.5} />}
+            title="I want to sponsor individual(s)"
             bg="bg-[#e9f7f1]" titleColor="text-[#0f9d7a]"
+          />
+          <ChoiceCard
+            onClick={() => choose('donate')}
+            icon={<HandCoins size={30} className="text-[#d6336c]" strokeWidth={1.5} />}
+            title="I want to donate to this event"
+            bg="bg-[#fdeef3]" titleColor="text-[#d6336c]"
           />
         </div>
       </main>
