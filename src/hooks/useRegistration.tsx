@@ -1,7 +1,7 @@
 import { useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
-import type { EventData, MealSelection, OrderData, SponsorshipData } from '../services/api'
-import { RegistrationContext, emptyGuestForm, emptyPurchaser, emptySponsorForm, MODE_STORAGE_KEY } from './registrationContext'
-import type { QuantityMap, GuestForm, RegMode, PurchaserForm, SponsorForm } from './registrationContext'
+import type { EventData, MealSelection, OrderData, SponsorshipData, DonationData } from '../services/api'
+import { RegistrationContext, emptyGuestForm, emptyPurchaser, emptySponsorForm, emptyDonateForm, MODE_STORAGE_KEY } from './registrationContext'
+import type { QuantityMap, GuestForm, RegMode, PurchaserForm, SponsorForm, DonateForm } from './registrationContext'
 
 // ── Provider ────────────────────────────────────────────────────────────────
 
@@ -32,8 +32,10 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
   const [consent, setConsent] = useState(false)
   const [sponsor, setSponsor] = useState<SponsorForm>(emptySponsorForm)
+  const [donate, setDonate] = useState<DonateForm>(emptyDonateForm)
   const [order, setOrder] = useState<OrderData | null>(null)
   const [sponsorship, setSponsorship] = useState<SponsorshipData | null>(null)
+  const [donation, setDonation] = useState<DonationData | null>(null)
   const [whatsappLink, setWhatsappLink] = useState<string | null>(null)
 
   // Set the quantity for a single option within a slot. Multiple options in the
@@ -88,6 +90,7 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
     setGuest(emptyGuestForm)
     setPurchaser(emptyPurchaser)
     setSponsor(emptySponsorForm)
+    setDonate(emptyDonateForm)
     setCustomAnswers({})
     setConsent(false)
     setQuantities({})
@@ -109,8 +112,10 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
       customAnswers, setCustomAnswers,
       consent, setConsent,
       sponsor, setSponsor,
+      donate, setDonate,
       order, setOrder, clearOrder,
       sponsorship, setSponsorship,
+      donation, setDonation,
       whatsappLink, setWhatsappLink,
       resetRegistration,
     }}>

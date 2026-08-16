@@ -87,8 +87,8 @@ export function PaymentVerifyPage() {
     verifyPayment(reference)
       .then((result) => {
         const ok = ['success', 'paid', 'completed', 'successful'].includes(result.status?.toLowerCase())
-        if (ok && result.sponsorship) {
-          navigate(`/events/s/${slug}/sponsor/success`)
+        if (ok && (result.sponsorship || result.donation)) {
+          navigate(`/events/s/${slug}/sponsor/success?kind=${result.donation ? 'donation' : 'sponsorship'}`)
         } else if (ok && result.order) {
           setOrder(result.order)
           setWhatsappLink(result.whatsappLink ?? null)
@@ -120,17 +120,26 @@ export function PaymentVerifyPage() {
 export function SuccessPage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
-  const { event: ctxEvent, order: ctxOrder, setOrder, setEvent, whatsappLink: ctxWhatsappLink, resetRegistration } = useRegistration()
+  const { event: ctxEvent, order: ctxOrder, mode: ctxMode, setOrder, setEvent, whatsappLink: ctxWhatsappLink, resetRegistration } = useRegistration()
   const navigate = useNavigate()
   const ticketRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
   const [order, setLocalOrder] = useState<OrderData | null>(ctxOrder)
   const [event, setLocalEvent] = useState<EventData | null>(ctxEvent)
-  // Captured at first render (before resetRegistration runs) — the link comes
-  // from the payment verify step and lives only in context.
+  // Captured at first render (before resetRegistration runs) — these come from
+  // the payment/verify step and live only in context.
   const [whatsappLink] = useState<string | null>(ctxWhatsappLink)
+  const [capturedMode] = useState(ctxMode)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  // "Pay for someone else": the payer must NOT see the attendee's ticket or the
+  // WhatsApp group link (those go to the guest). Detect from the order's
+  // purchaser (robust across refreshes) or the captured mode as a fallback.
+  const paidForSomeoneElse =
+    (!!order?.purchaser?.email && !!order.guest?.email &&
+      order.purchaser.email.toLowerCase() !== order.guest.email.toLowerCase()) ||
+    capturedMode === 'someone-else'
 
   // A completed order — wipe the draft so a fresh registration starts clean.
   useEffect(() => { resetRegistration() }, [])
@@ -241,61 +250,88 @@ export function SuccessPage() {
           </div>
         )}
 
-        <div className="text-center max-w-[480px]">
-          <div className="text-[64px] mb-4">🎉</div>
-          <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Registered!</h2>
-          <p className="text-[15px] text-gray-600 mb-2">
-            Yay! We can't wait to have you at {event?.name ?? 'the event'}.
-          </p>
-          <p className="text-[14px] text-gray-400 mb-8">
-            A copy of your tickets have been sent to your email. You can also download your ticket here directly.
-          </p>
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold mx-auto transition-all disabled:opacity-60"
-            style={{ backgroundColor: '#2F64E1' }}
-          >
-            {downloading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Preparing...
-              </>
-            ) : (
-              <>
-                Download ticket
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </>
-            )}
-          </button>
+        {paidForSomeoneElse ? (
+          // Payer view — payment confirmation only. Ticket + WhatsApp link go to
+          // the attendee, so they're intentionally not shown here.
+          <div className="text-center max-w-[480px]">
+            <div className="text-[64px] mb-4">✅</div>
+            <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Payment successful!</h2>
+            <p className="text-[15px] text-gray-600 mb-2">
+              Thank you. Your payment for{' '}
+              <span className="font-semibold text-gray-800">
+                {order ? `${order.guest.firstName} ${order.guest.lastName}`.trim() : 'the attendee'}
+              </span>{' '}
+              was successful.
+            </p>
+            <p className="text-[14px] text-gray-400 mb-8">
+              Their ticket has been sent to their email address
+              {order?.guest?.email ? ` (${order.guest.email})` : ''}. A payment receipt has been sent to yours.
+            </p>
+            <button
+              onClick={() => navigate(slug ? `/events/s/${slug}` : '/')}
+              className="px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold mx-auto"
+              style={{ backgroundColor: '#2F64E1' }}
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="text-center max-w-[480px]">
+            <div className="text-[64px] mb-4">🎉</div>
+            <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Registered!</h2>
+            <p className="text-[15px] text-gray-600 mb-2">
+              Yay! We can't wait to have you at {event?.name ?? 'the event'}.
+            </p>
+            <p className="text-[14px] text-gray-400 mb-8">
+              A copy of your tickets have been sent to your email. You can also download your ticket here directly.
+            </p>
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold mx-auto transition-all disabled:opacity-60"
+              style={{ backgroundColor: '#2F64E1' }}
+            >
+              {downloading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Preparing...
+                </>
+              ) : (
+                <>
+                  Download ticket
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </>
+              )}
+            </button>
 
-          {whatsappLink && /^https?:\/\//i.test(whatsappLink) && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <p className="text-[14px] text-gray-500 mb-3">Join the event WhatsApp group to stay updated.</p>
-              <a
-                href={whatsappLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold transition-all hover:opacity-90"
-                style={{ backgroundColor: '#25D366' }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.002-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                </svg>
-                Join WhatsApp group
-              </a>
-            </div>
-          )}
-        </div>
+            {whatsappLink && /^https?:\/\//i.test(whatsappLink) && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <p className="text-[14px] text-gray-500 mb-3">Join the event WhatsApp group to stay updated.</p>
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold transition-all hover:opacity-90"
+                  style={{ backgroundColor: '#25D366' }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.002-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                  </svg>
+                  Join WhatsApp group
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <Footer />
 
-      {order && (
+      {order && !paidForSomeoneElse && (
         <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1, pointerEvents: 'none' }}>
           <TicketDocument
             ref={ticketRef}
@@ -327,8 +363,8 @@ export function PaymentCallbackPage() {
     verifyPayment(reference)
       .then((result) => {
         const ok = ['success', 'paid', 'completed', 'successful'].includes(result.status?.toLowerCase())
-        if (ok && result.sponsorship) {
-          navigate('/payment/sponsor-success')
+        if (ok && (result.sponsorship || result.donation)) {
+          navigate(`/payment/sponsor-success?kind=${result.donation ? 'donation' : 'sponsorship'}`)
         } else if (ok && result.order) {
           setOrder(result.order)
           setWhatsappLink(result.whatsappLink ?? null)
@@ -356,10 +392,12 @@ export function PaymentCallbackPage() {
 
 export function SponsorSuccessPage() {
   const { slug } = useParams<{ slug: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { event, resetRegistration } = useRegistration()
+  const isDonation = searchParams.get('kind') === 'donation'
 
-  // A completed sponsorship — wipe the draft so a fresh journey starts clean.
+  // A completed sponsorship/donation — wipe the draft so a fresh journey starts clean.
   useEffect(() => { resetRegistration() }, [])
 
   return (
@@ -369,9 +407,11 @@ export function SponsorSuccessPage() {
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="text-center max-w-[480px]">
           <div className="text-[64px] mb-4">🎉</div>
-          <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">Thank you for sponsoring!</h2>
+          <h2 className="text-[28px] font-bold text-[#0d1b2a] mb-3">
+            {isDonation ? 'Thank you for your donation!' : 'Thank you for sponsoring!'}
+          </h2>
           <p className="text-[15px] text-gray-600 mb-2">
-            Your sponsorship of {event?.name ?? 'this event'} has been received.
+            Your {isDonation ? 'donation to' : 'sponsorship of'} {event?.name ?? 'this event'} has been received.
           </p>
           <p className="text-[14px] text-gray-400 mb-8">
             A receipt of your payment has been sent to your email address.

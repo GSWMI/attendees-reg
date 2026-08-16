@@ -1,33 +1,41 @@
-import type { EventData, SponsorshipCategory } from '../services/api'
+import type { EventData } from '../services/api'
 
-// PLACEHOLDER per-person prices, used only until the backend returns real
-// values in event.sponsorshipUnitPrices. See the registration-flow-redesign
-// note — Specific Sponsorship totals are provisional until then.
-export const PLACEHOLDER_UNIT_PRICES: Record<SponsorshipCategory, number> = {
-  meal: 6500,
-  accommodation: 20000,
-  transport: 5000,
+// Sponsorship pricing is a DEDICATED admin-configured price list on the event
+// (event.sponsorshipUnitPrices), separate from normal ticket prices. The backend
+// prices sponsorships from it and rejects categories that aren't configured.
+// It must also be returned on the event read for these helpers to work.
+
+export interface SponsorAccItem {
+  identifier: string   // accommodation id
+  name: string
+  price: number        // per-person sponsorship price
 }
 
-export const CATEGORY_LABELS: Record<SponsorshipCategory, string> = {
-  meal: 'meal',
-  accommodation: 'accommodation',
-  transport: 'transport',
+export function sponsorshipMealPrice(event: EventData | null): number | null {
+  const v = event?.sponsorshipUnitPrices?.meal
+  return typeof v === 'number' ? v : null
 }
 
-// Resolve the per-person unit price for a sponsorship category. Falls back to a
-// placeholder (flagged) when the event has no admin-set price yet.
-export function getUnitPrice(
-  event: EventData | null,
-  category: SponsorshipCategory
-): { price: number; isPlaceholder: boolean } {
-  const up = event?.sponsorshipUnitPrices
-  if (up) {
-    if (category === 'meal' && typeof up.meal === 'number') return { price: up.meal, isPlaceholder: false }
-    if (category === 'transport' && typeof up.transport === 'number') return { price: up.transport, isPlaceholder: false }
-    if (category === 'accommodation' && up.accommodation && up.accommodation.length > 0) {
-      return { price: up.accommodation[0].pricePerPerson, isPlaceholder: false }
-    }
-  }
-  return { price: PLACEHOLDER_UNIT_PRICES[category], isPlaceholder: true }
+export function sponsorshipTransportPrice(event: EventData | null): number | null {
+  const v = event?.sponsorshipUnitPrices?.transport
+  return typeof v === 'number' ? v : null
+}
+
+// Accommodation sponsorship items: the configured per-type prices, joined with
+// the event's accommodations list for display names.
+export function accommodationSponsorItems(event: EventData | null): SponsorAccItem[] {
+  const prices = event?.sponsorshipUnitPrices?.accommodation ?? []
+  return prices.map((p) => {
+    const acc = event?.accommodations?.find((a) => a._id === p.accommodationId)
+    return { identifier: p.accommodationId, name: acc?.name ?? 'Accommodation', price: p.pricePerPerson }
+  })
+}
+
+// Whether the event has any sponsorship pricing configured at all.
+export function sponsorshipConfigured(event: EventData | null): boolean {
+  return (
+    sponsorshipMealPrice(event) != null ||
+    sponsorshipTransportPrice(event) != null ||
+    accommodationSponsorItems(event).length > 0
+  )
 }
