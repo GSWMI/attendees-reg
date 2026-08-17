@@ -33,7 +33,7 @@ export default function ReviewPage() {
 
   if (!event || !guest.firstName) return null
 
-  const editItems = () => navigate(`/events/s/${slug}`)
+  const editItems = () => navigate(`/events/s/${slug}/tickets`)
   const editDetails = () => navigate(`/events/s/${slug}/register`)
 
   const hasMeal = mealSelections.length > 0 && mealSelections.some((s) => s.meals.length > 0)
