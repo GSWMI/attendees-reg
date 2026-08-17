@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Mail, Phone } from 'lucide-react'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
+import { ConsentChecks } from '../components/ConsentChecks'
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -18,6 +19,7 @@ export default function DonatePage() {
   const navigate = useNavigate()
   const { event, donate, setDonate } = useRegistration()
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [consentOk, setConsentOk] = useState(false)
 
   useEffect(() => {
     if (!event) navigate(`/events/s/${slug}`)
@@ -40,6 +42,7 @@ export default function DonatePage() {
     const amt = Number(donate.amount)
     if (!donate.amount.trim()) errs.amount = 'Required'
     else if (!Number.isFinite(amt) || amt <= 0) errs.amount = 'Enter a valid amount'
+    if (!consentOk) errs.consent = 'Please tick all the required confirmations'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -49,7 +52,7 @@ export default function DonatePage() {
     navigate(`/events/s/${slug}/donate/review`)
   }
 
-  const canContinue = donate.firstName && donate.lastName && donate.email && donate.amount
+  const canContinue = donate.firstName && donate.lastName && donate.email && donate.amount && consentOk
 
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
@@ -102,6 +105,12 @@ export default function DonatePage() {
             </span>
             <span className="text-[14px] text-gray-700">Keep me anonymous</span>
           </button>
+        </div>
+
+        {/* Consent */}
+        <div className="px-1 mt-4">
+          <ConsentChecks onChange={(ok) => { setConsentOk(ok); if (ok) setErrors((p) => ({ ...p, consent: '' })) }} />
+          {errors.consent && <p className="text-[12px] text-red-500 mt-2">{errors.consent}</p>}
         </div>
 
         <div className="mt-4">

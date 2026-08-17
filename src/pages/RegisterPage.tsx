@@ -3,23 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Mail, Phone, ChevronDown, ChevronUp } from 'lucide-react'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
-
-// Strip HTML entities from backend-generated strings
-function sanitizeHtml(raw: string): string {
-  if (!raw) return ''
-  return raw
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/p>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-}
+import { ConsentChecks } from '../components/ConsentChecks'
 
 // Validate a phone number. Accepts Nigerian local format (e.g. 08012345678)
 // or international format (e.g. +2348012345678); allows spaces, dashes and
@@ -39,13 +23,14 @@ export default function RegisterPage() {
   const {
     event, mode,
     guest, setGuest, purchaser, setPurchaser,
-    customAnswers, setCustomAnswers, consent, setConsent,
+    customAnswers, setCustomAnswers,
   } = useRegistration()
 
   const isSomeoneElse = mode === 'someone-else'
 
   const [personalOpen, setPersonalOpen] = useState(true)
   const [nokOpen, setNokOpen] = useState(false)
+  const [consentOk, setConsentOk] = useState(false)
   // "Same as call number" toggles — inferred from existing values on return.
   const [guestPhoneSame, setGuestPhoneSame] = useState(() => !!guest.phone && guest.phone === guest.whatsappNumber)
   const [nokPhoneSame, setNokPhoneSame] = useState(() => !!guest.nokPhone && guest.nokPhone === guest.nokWhatsappNumber)
@@ -115,7 +100,7 @@ export default function RegisterPage() {
       else if (!isValidPhone(guest.nokPhone)) errs.nokPhone = 'Invalid phone number'
     }
 
-    if (!consent) errs.consent = 'You must agree to the terms'
+    if (!consentOk) errs.consent = 'Please tick all the required confirmations'
     event?.customQuestions?.forEach((q) => {
       if (q.required && !customAnswers[q.question]?.trim()) errs[q.question] = 'Required'
     })
@@ -139,14 +124,6 @@ export default function RegisterPage() {
 
   const personalTitle = isSomeoneElse ? 'Provide the details of the person you are registering for' : 'Your personal details'
   const nokTitle = isSomeoneElse ? "Provide the details of the person's next of kin" : 'Your next of kin details'
-  const allergyPlaceholderNote = isSomeoneElse ? "the person's" : 'your'
-
-  const cleanConsentText = isSomeoneElse
-    ? "I confirm that the information provided is accurate and I consent to the use of the person's details for event coordination and logistics purposes."
-    : sanitizeHtml(
-        event.consentText ||
-        'I confirm that the information provided is accurate and I consent to the use of my details for event coordination and logistics purposes.'
-      )
 
   return (
     <div className="min-h-screen bg-[#f5f5f3] flex flex-col">
@@ -241,9 +218,6 @@ export default function RegisterPage() {
                 {errors[q.question] && <p className="text-[12px] text-red-500">{errors[q.question]}</p>}
               </div>
             ))}
-            <p className="text-[11px] text-gray-400 -mt-1">
-              e.g. share any food allergies {allergyPlaceholderNote} may have; type "N/A" if none.
-            </p>
           </Accordion>
 
           {/* Next of kin */}
@@ -270,16 +244,10 @@ export default function RegisterPage() {
           </Accordion>
 
           {/* Consent */}
-          <div className="flex items-start gap-3 px-1">
-            <input type="checkbox" id="consent" checked={consent}
-              onChange={(e) => { setConsent(e.target.checked); setErrors((p) => ({ ...p, consent: '' })) }}
-              className="mt-1 w-4 h-4 accent-[#3b5bdb] shrink-0" />
-            <div>
-              <label htmlFor="consent" className="text-[14px] text-gray-700 cursor-pointer leading-relaxed">
-                {cleanConsentText}<span className="text-[#3b5bdb] ml-1">*</span>
-              </label>
-              {errors.consent && <p className="text-[12px] text-red-500 mt-1">{errors.consent}</p>}
-            </div>
+          <div className="px-1">
+            <ConsentChecks showAuthority={isSomeoneElse}
+              onChange={(ok) => { setConsentOk(ok); if (ok) setErrors((p) => ({ ...p, consent: '' })) }} />
+            {errors.consent && <p className="text-[12px] text-red-500 mt-2">{errors.consent}</p>}
           </div>
 
           <div>

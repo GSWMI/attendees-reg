@@ -103,8 +103,6 @@ export interface RegistrationContextValue {
   setPurchaser: Dispatch<SetStateAction<PurchaserForm>>
   customAnswers: Record<string, string>
   setCustomAnswers: Dispatch<SetStateAction<Record<string, string>>>
-  consent: boolean
-  setConsent: Dispatch<SetStateAction<boolean>>
   // Sponsor-individuals draft — persisted across the sponsor form/review steps
   sponsor: SponsorForm
   setSponsor: Dispatch<SetStateAction<SponsorForm>>

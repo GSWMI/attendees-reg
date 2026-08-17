@@ -8,6 +8,7 @@ import {
   sponsorshipConfigured, type SponsorAccItem,
 } from '../lib/sponsorship'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
+import { ConsentChecks } from '../components/ConsentChecks'
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -27,6 +28,7 @@ export default function SponsorPage() {
   const navigate = useNavigate()
   const { event, sponsor, setSponsor } = useRegistration()
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [consentOk, setConsentOk] = useState(false)
 
   useEffect(() => {
     if (!event) navigate(`/events/s/${slug}`)
@@ -90,6 +92,7 @@ export default function SponsorPage() {
     if (sponsor.phone.trim() && !isValidPhone(sponsor.phone)) errs.phone = 'Invalid phone number'
     if (sponsor.categories.length === 0) errs.categories = 'Select at least one category'
     else if (totalSelectedPersons === 0) errs.categories = 'Enter the number of persons for at least one category'
+    if (!consentOk) errs.consent = 'Please tick all the required confirmations'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -211,11 +214,17 @@ export default function SponsorPage() {
             )}
           </div>
 
+          {/* Consent */}
+          <div className="px-1">
+            <ConsentChecks onChange={(ok) => { setConsentOk(ok); if (ok) setErrors((p) => ({ ...p, consent: '' })) }} />
+            {errors.consent && <p className="text-[12px] text-red-500 mt-2">{errors.consent}</p>}
+          </div>
+
           <div>
             <button onClick={handleContinue}
-              disabled={sponsor.categories.length === 0 || totalSelectedPersons === 0}
+              disabled={sponsor.categories.length === 0 || totalSelectedPersons === 0 || !consentOk}
               className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg text-[15px] font-semibold transition-all ${
-                sponsor.categories.length > 0 && totalSelectedPersons > 0
+                sponsor.categories.length > 0 && totalSelectedPersons > 0 && consentOk
                   ? 'bg-[#3b5bdb] text-white hover:bg-[#3451c7]' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}>
               Continue
