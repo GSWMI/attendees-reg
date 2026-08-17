@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 
 export function Header() {
   const [open, setOpen] = useState(false)
@@ -79,8 +80,11 @@ export function AnnouncementBanner({ text }: { text?: string }) {
 
 export function Footer() {
   return (
-    <footer className="py-5 text-center text-[12px] text-gray-400 border-t border-gray-200 bg-[#f9f9f9]">
-      © GSWMI Logistics Team
+    <footer className="py-5 flex flex-col items-center gap-1.5 text-[12px] text-gray-400 border-t border-gray-200 bg-[#f9f9f9]">
+      <span>© GSWMI Logistics Team</span>
+      <Link to="/privacy" className="text-gray-500 hover:text-gray-700 underline underline-offset-2">
+        Privacy Notice
+      </Link>
     </footer>
   )
 }

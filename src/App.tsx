@@ -9,6 +9,7 @@ import SponsorPage from './pages/SponsorPage'
 import SponsorReviewPage from './pages/SponsorReviewPage'
 import DonatePage from './pages/DonatePage'
 import DonateReviewPage from './pages/DonateReviewPage'
+import PrivacyPage from './pages/PrivacyPage'
 import {
   PleaseWaitPage,
   PaymentFailedPage,
@@ -45,6 +46,9 @@ export default function App() {
         <Routes>
           {/* Home — upcoming events list */}
           <Route path="/" element={<HomePage />} />
+
+          {/* Privacy notice */}
+          <Route path="/privacy" element={<PrivacyPage />} />
 
           {/* Event landing — choose how to register */}
           <Route path="/events/s/:slug" element={<ChoicePage />} />

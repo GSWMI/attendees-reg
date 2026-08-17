@@ -30,7 +30,6 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
   const [guest, setGuest] = useState<GuestForm>(emptyGuestForm)
   const [purchaser, setPurchaser] = useState<PurchaserForm>(emptyPurchaser)
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
-  const [consent, setConsent] = useState(false)
   const [sponsor, setSponsor] = useState<SponsorForm>(emptySponsorForm)
   const [donate, setDonate] = useState<DonateForm>(emptyDonateForm)
   const [order, setOrder] = useState<OrderData | null>(null)
@@ -92,7 +91,6 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
     setSponsor(emptySponsorForm)
     setDonate(emptyDonateForm)
     setCustomAnswers({})
-    setConsent(false)
     setQuantities({})
     setSelectedAccommodationId('')
     setSelectedTransportId('')
@@ -110,7 +108,6 @@ export function RegistrationProvider({ children }: { children: ReactNode }) {
       guest, setGuest,
       purchaser, setPurchaser,
       customAnswers, setCustomAnswers,
-      consent, setConsent,
       sponsor, setSponsor,
       donate, setDonate,
       order, setOrder, clearOrder,

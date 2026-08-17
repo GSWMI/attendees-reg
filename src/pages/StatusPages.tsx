@@ -268,11 +268,11 @@ export function SuccessPage() {
               {order?.guest?.email ? ` (${order.guest.email})` : ''}. A payment receipt has been sent to yours.
             </p>
             <button
-              onClick={() => navigate(slug ? `/events/s/${slug}` : '/')}
+              onClick={() => navigate('/')}
               className="px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold mx-auto"
               style={{ backgroundColor: '#2F64E1' }}
             >
-              Done
+              Back to home
             </button>
           </div>
         ) : (
@@ -325,6 +325,11 @@ export function SuccessPage() {
                 </a>
               </div>
             )}
+
+            <button onClick={() => navigate('/')}
+              className="mt-6 text-[14px] text-gray-500 hover:text-gray-700 underline underline-offset-2">
+              Back to home
+            </button>
           </div>
         )}
       </main>
@@ -391,7 +396,6 @@ export function PaymentCallbackPage() {
 // ── Sponsorship Success ───────────────────────────────────────────────────────
 
 export function SponsorSuccessPage() {
-  const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { event, resetRegistration } = useRegistration()
@@ -417,11 +421,11 @@ export function SponsorSuccessPage() {
             A receipt of your payment has been sent to your email address.
           </p>
           <button
-            onClick={() => navigate(slug ? `/events/s/${slug}` : '/')}
+            onClick={() => navigate('/')}
             className="px-8 py-3.5 rounded-xl text-white text-[15px] font-semibold"
             style={{ backgroundColor: '#2F64E1' }}
           >
-            Done
+            Back to home
           </button>
         </div>
       </main>
