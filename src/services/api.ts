@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://gwmi-backend-staging.onrender.com/api'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://gswmi-backend-prod.onrender.com/api'
 
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

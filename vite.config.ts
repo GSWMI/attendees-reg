@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'https://gwmi-backend-staging.onrender.com/api',
+        target: 'https://gswmi-backend-prod.onrender.com/api',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/api/, '/api'),
