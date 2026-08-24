@@ -4,6 +4,7 @@ import { MapPin, Calendar } from 'lucide-react'
 import { getAllEvents } from '../services/api'
 import type { EventData } from '../services/api'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
+import { richTextToPlain } from '../lib/richText'
 
 function formatDate(s: string) {
   if (!s) return ''
@@ -12,22 +13,6 @@ function formatDate(s: string) {
 
 function isUpcoming(event: EventData) {
   return new Date(event.endDate) >= new Date()
-}
-
-function sanitizeHtml(raw: string): string {
-  if (!raw) return ''
-  return raw
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/p>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
 }
 
 export default function HomePage() {
@@ -103,7 +88,7 @@ export default function HomePage() {
 
                     {event.description && (
                       <p className="text-[13px] text-gray-500 line-clamp-2">
-                        {sanitizeHtml(event.description)}
+                        {richTextToPlain(event.description)}
                       </p>
                     )}
 

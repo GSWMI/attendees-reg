@@ -5,6 +5,8 @@ import { getEventBySlug } from '../services/api'
 import type { AccommodationData, TransportData } from '../services/api'
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
+import { RichText } from '../components/RichText'
+import { richTextToPlain } from '../lib/richText'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -13,21 +15,6 @@ function formatDate(s: string) {
   return new Date(s).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function sanitizeHtml(raw: string): string {
-  if (!raw) return ''
-  return raw
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
 
 // Hardcoded clean descriptions for events where the admin-entered text
 // has formatting issues that can't be fixed by stripping HTML alone.
@@ -188,10 +175,9 @@ export default function EventPage() {
   const handleAccCheck = () => { const n = !accChecked; setAccChecked(n); setAccOpen(n); if (!n) setSelectedAccommodationId('') }
   const handleTransportCheck = () => { const n = !transportChecked; setTransportChecked(n); setTransportOpen(n); if (!n) setSelectedTransportId('') }
 
-  // Use hardcoded lines for known broken slugs, otherwise sanitize from API
-  const descLines: string[] = slug && HARDCODED_DESCRIPTIONS[slug]
-    ? HARDCODED_DESCRIPTIONS[slug]
-    : sanitizeHtml(event.description ?? '').split('\n').filter((l) => l.trim())
+  // A few legacy events have hardcoded plain-text descriptions (their stored
+  // description predates rich text). Everything else renders the admin's HTML.
+  const hardcodedDesc = slug ? HARDCODED_DESCRIPTIONS[slug] : undefined
 
   // This image is a tall portrait format — use object-contain so full image shows
   const isTallImage = slug === 'supernatural-retreat-2026-mohtjtc7'
@@ -238,20 +224,22 @@ export default function EventPage() {
           <div className="p-6 md:p-8 flex flex-col gap-4">
             <h1 className="text-2xl md:text-3xl font-bold text-[#0d1b2a] leading-tight">{event.name}</h1>
 
-            {descLines.length > 0 && (
+            {hardcodedDesc ? (
               <div className="text-[14px] text-gray-600 leading-relaxed">
                 <div className={descExpanded ? '' : 'line-clamp-4'}>
-                  {descLines.map((line, i) => (
+                  {hardcodedDesc.map((line, i) => (
                     <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{line}</p>
                   ))}
                 </div>
-                {descLines.length > 4 && (
+                {hardcodedDesc.length > 4 && (
                   <button onClick={() => setDescExpanded((v) => !v)}
                     className="text-[#3b5bdb] text-[13px] hover:underline mt-2">
                     {descExpanded ? 'Show less' : 'Read more'}
                   </button>
                 )}
               </div>
+            ) : (
+              <RichText html={event.description} className="text-[14px] text-gray-600 leading-relaxed" />
             )}
 
             <div className="flex items-center gap-2 text-[13px] text-gray-700">
@@ -387,7 +375,7 @@ export default function EventPage() {
                   <div className="flex flex-col gap-2">
                     {accommodations.map((acc) => {
                       const isSelected = selectedAccommodationId === acc._id
-                      const cleanDesc = sanitizeHtml(acc.description ?? '')
+                      const cleanDesc = richTextToPlain(acc.description ?? '')
                       return (
                         <div key={acc._id}>
                           <button type="button" onClick={() => setSelectedAccommodationId(acc._id)}
@@ -451,7 +439,7 @@ export default function EventPage() {
                   <div className="flex flex-col gap-2 mb-3">
                     {transports.map((t) => {
                       const isSelected = selectedTransportId === t._id
-                      const cleanDesc = sanitizeHtml(t.description ?? '')
+                      const cleanDesc = richTextToPlain(t.description ?? '')
                       return (
                         <div key={t._id}>
                           <button type="button" onClick={() => setSelectedTransportId(t._id)}

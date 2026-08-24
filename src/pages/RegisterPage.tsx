@@ -4,6 +4,7 @@ import { ArrowLeft, User, Mail, Phone, ChevronDown, ChevronUp } from 'lucide-rea
 import { useRegistration } from '../hooks/useRegistration.ts'
 import { Header, AnnouncementBanner, Footer } from '../components/Layout'
 import { ConsentChecks } from '../components/ConsentChecks'
+import { RichText } from '../components/RichText'
 
 // Validate a phone number. Accepts Nigerian local format (e.g. 08012345678)
 // or international format (e.g. +2348012345678); allows spaces, dashes and
@@ -244,10 +245,15 @@ export default function RegisterPage() {
           </Accordion>
 
           {/* Consent */}
-          <div className="px-1">
+          <div className="px-1 flex flex-col gap-3">
+            {/* Event organiser's own consent/terms text (admin-authored rich text) */}
+            {event.consentText && (
+              <RichText html={event.consentText}
+                className="text-[13px] text-gray-600 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg p-3" />
+            )}
             <ConsentChecks showAuthority={isSomeoneElse}
               onChange={(ok) => { setConsentOk(ok); if (ok) setErrors((p) => ({ ...p, consent: '' })) }} />
-            {errors.consent && <p className="text-[12px] text-red-500 mt-2">{errors.consent}</p>}
+            {errors.consent && <p className="text-[12px] text-red-500 mt-1">{errors.consent}</p>}
           </div>
 
           <div>
