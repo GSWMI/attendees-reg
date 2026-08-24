@@ -16,7 +16,13 @@ const RICH_TEXT_CLASSES =
   '[&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:underline [&_a]:text-[#3b5bdb] [&_a]:break-words'
 
 export function RichText({ html, className = '' }: { html?: string; className?: string }) {
-  const clean = sanitizeRichHtml(html)
+  if (!html) return null
+  // Legacy values may still be PLAIN TEXT (older events pre-date rich text, and
+  // the backend hasn't re-saved them as HTML). Plain-text line breaks would
+  // otherwise collapse, so convert newlines to <br> when there are no real tags.
+  const looksLikeHtml = /<[a-z!/][^>]*>/i.test(html)
+  const prepared = looksLikeHtml ? html : html.replace(/\r?\n/g, '<br>')
+  const clean = sanitizeRichHtml(prepared)
   if (!clean) return null // empty / whitespace-only / nothing visible after sanitizing
   return (
     <div
