@@ -230,7 +230,7 @@ export default function ReviewPage() {
                   logo={<PaystackLogo />}
                 />
               </div>
-              {error && <p className="text-[12px] text-red-500 mb-3">{error}</p>}
+              {error && <p className="text-[12px] text-red-500 mb-3 whitespace-pre-line">{error}</p>}
               <button
                 onClick={handleConfirm}
                 disabled={loading}

@@ -8,8 +8,46 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.message ?? 'Something went wrong')
+  if (!res.ok) throw new Error(errorMessage(data))
   return data
+}
+
+// Turn a backend error body into a readable message. The API returns
+// per-field validation errors in an `errors` array (Joi messages like
+// `"guest.email" must be a valid email`); surface those instead of the
+// generic top-level "Validation failed" so the user knows what to fix.
+function errorMessage(data: unknown): string {
+  const body = (data ?? {}) as { message?: string; errors?: unknown }
+  const list = Array.isArray(body.errors) ? body.errors : []
+  const messages = list
+    .map((e) => (typeof e === 'string' ? e : (e as { message?: string })?.message))
+    .filter((m): m is string => !!m)
+    // Replace the Joi field path with a friendly label:
+    // `"guest.nextOfKin.email"` → `Next of kin email`.
+    .map((m) => m.replace(/^"([^"]+)"/, (_, path: string) => humanizeFieldPath(path)))
+  if (messages.length) return messages.join('\n')
+  return body.message ?? 'Something went wrong'
+}
+
+// Map a Joi field path (e.g. `guest.nextOfKin.email`) to a human label.
+// The prefix disambiguates the several email/phone fields across the form:
+// payer vs. attendee vs. next of kin.
+function humanizeFieldPath(path: string): string {
+  const prefixes: [string, string][] = [
+    ['guest.nextOfKin.', 'Next of kin '],
+    ['guest.', 'Your '],
+    ['purchaser.', 'Payer '],
+    ['sponsor.', 'Sponsor '],
+  ]
+  for (const [prefix, label] of prefixes) {
+    if (path.startsWith(prefix)) {
+      const field = path.slice(prefix.length).replace(/\./g, ' ')
+      return label + field
+    }
+  }
+  // No known prefix — fall back to the last path segment, capitalized.
+  const field = path.split('.').pop() ?? path
+  return field.charAt(0).toUpperCase() + field.slice(1)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
