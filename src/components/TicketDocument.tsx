@@ -16,9 +16,17 @@ function formatDateTime(s: string) {
 
 function getDayDate(event: EventData, day: number): string {
   if (!day || !event.startDate) return ''
-  const start = new Date(event.startDate)
-  start.setDate(start.getDate() + day - 1)
-  return start.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()
+  // Event dates are stored as a calendar date at midnight UTC
+  // (YYYY-MM-DDT00:00:00.000Z). We deliberately parse only the date part and
+  // build the date in UTC so the viewer's timezone can never shift the day —
+  // previously a viewer behind UTC saw the day roll back by one (e.g. Sep 30 →
+  // Sep 29). Confirmed with backend: dates are date-only and always UTC.
+  const [y, m, d] = event.startDate.slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return ''
+  const date = new Date(Date.UTC(y, m - 1, d + day - 1)) // Date.UTC normalizes month/year rollover
+  return date
+    .toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .toUpperCase()
 }
 
 function capitalize(s: string) {
